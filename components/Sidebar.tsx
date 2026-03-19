@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/app/i18n";
+import { clearUserSession, subscribeToUserSession } from "@/utils/user-session";
 import "@/app/styles/fantasy-ui.css";
 
 interface SidebarProps {
@@ -25,13 +26,10 @@ export default function Sidebar({ isOpen, toggleSidebar, openLoginModal }: Sideb
   const [isCreatorOpen, setIsCreatorOpen] = useState(true);
   
   useEffect(() => {
-    const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-    const storedUsername = localStorage.getItem("username");
-
-    setIsLoggedIn(loggedIn);
-    if (storedUsername) {
-      setUsername(storedUsername);
-    }
+    return subscribeToUserSession((session) => {
+      setIsLoggedIn(session.isLoggedIn);
+      setUsername(session.username);
+    });
   }, []);
 
   useEffect(() => {
@@ -59,12 +57,7 @@ export default function Sidebar({ isOpen, toggleSidebar, openLoginModal }: Sideb
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("username");
-    localStorage.removeItem("userId");
-
-    setIsLoggedIn(false);
-
+    clearUserSession();
     router.push("/");
   };
 

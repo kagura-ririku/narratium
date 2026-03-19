@@ -40,6 +40,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [hideSettingsButton, setHideSettingsButton] = useState(false);
   const lastIsMobileRef = useRef<boolean | null>(null);
 
   useEffect(() => {
@@ -70,6 +71,26 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     window.addEventListener("resize", checkIfMobile);
     
     return () => window.removeEventListener("resize", checkIfMobile);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleCharacterViewChange = (event: Event) => {
+      const nextHide = (event as CustomEvent<{ hideSettings?: boolean }>).detail?.hideSettings === true;
+      setHideSettingsButton(nextHide);
+      if (nextHide) {
+        setModelSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("narratium:character-view-change", handleCharacterViewChange as EventListener);
+
+    return () => {
+      window.removeEventListener("narratium:character-view-change", handleCharacterViewChange as EventListener);
+    };
   }, []);
 
   const toggleSidebar = () => {
@@ -109,9 +130,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           `}
       >
         <div className="h-full min-w-0 relative overflow-x-hidden">
-          <div className="fixed top-3 right-3 z-20 md:absolute md:top-4 md:right-4 md:z-[999]">
-            <SettingsDropdown toggleModelSidebar={toggleModelSidebar} />
-          </div>
+          {!hideSettingsButton && (
+            <div className="fixed top-3 right-3 z-20 md:absolute md:top-4 md:right-4 md:z-[999]">
+              <SettingsDropdown
+                toggleModelSidebar={toggleModelSidebar}
+                openLoginModal={() => setIsLoginModalOpen(true)}
+              />
+            </div>
+          )}
 
           {children}
         </div>

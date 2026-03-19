@@ -140,6 +140,32 @@ export default function CharacterPage() {
     return () => window.removeEventListener("resize", syncViewport);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("narratium:character-view-change", {
+        detail: { hideSettings: activeView !== "chat" },
+      }),
+    );
+  }, [activeView]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent("narratium:character-view-change", {
+          detail: { hideSettings: false },
+        }),
+      );
+    };
+  }, []);
+
   const truncateMessagesAfter = async (nodeId: string) => {
     if (!characterId) return;
     
@@ -603,16 +629,18 @@ export default function CharacterPage() {
       />
 
       <div className="flex-1 w-full min-w-0 fantasy-bg h-full transition-all duration-300 ease-in-out flex flex-col overflow-x-hidden">
-        <CharacterChatHeader
-          character={character}
-          serifFontClass={serifFontClass}
-          sidebarCollapsed={sidebarCollapsed}
-          activeView={activeView}
-          toggleSidebar={toggleSidebar}
-          onSwitchToView={switchToView}
-          onToggleView={toggleView}
-          onToggleRegexEditor={toggleRegexEditor}
-        />
+        {activeView === "chat" && (
+          <CharacterChatHeader
+            character={character}
+            serifFontClass={serifFontClass}
+            sidebarCollapsed={sidebarCollapsed}
+            activeView={activeView}
+            toggleSidebar={toggleSidebar}
+            onSwitchToView={switchToView}
+            onToggleView={toggleView}
+            onToggleRegexEditor={toggleRegexEditor}
+          />
+        )}
 
         {activeView === "chat" ? (
           <CharacterChatPanel

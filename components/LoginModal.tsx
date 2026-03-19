@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/app/i18n";
+import { getStoredUserSession, persistUserSession } from "@/utils/user-session";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -28,6 +29,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       inputRef.current.focus();
     }
   }, [isOpen, step, showQuestion]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const { username: storedUsername } = getStoredUserSession();
+    setActiveTab("password");
+    setUsername(storedUsername);
+    setPassword("");
+    setVerificationCode("");
+    setError("");
+    setStep(1);
+    setShowQuestion(true);
+  }, [isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -130,18 +146,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setError("");
 
     try {
-      const userId = Math.floor(Math.random() * 10000).toString();
-      
-      localStorage.setItem("username", username);
-      localStorage.setItem("userId", userId);
-      localStorage.setItem("isLoggedIn", "true");
+      persistUserSession(username);
 
       onClose();
       setStep(1);
       setUsername("");
       setPassword("");
       setVerificationCode("");
-      window.location.reload();
     } catch (err) {
       console.error("Login error:", err);
       setError("登录失败，请重试");

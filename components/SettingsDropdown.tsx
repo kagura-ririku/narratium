@@ -1,21 +1,32 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/app/i18n";
 import { useSoundContext } from "@/contexts/SoundContext";
 import { useTour } from "@/hooks/useTour";
 import { exportDataToFile, importDataFromFile, generateExportFilename, downloadFile } from "@/function/data/export-import";
+import { subscribeToUserSession } from "@/utils/user-session";
 
 interface SettingsDropdownProps {
   toggleModelSidebar: () => void;
+  openLoginModal: () => void;
 }
 
-export default function SettingsDropdown({ toggleModelSidebar }: SettingsDropdownProps) {
+export default function SettingsDropdown({ toggleModelSidebar, openLoginModal }: SettingsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { language, setLanguage, t } = useLanguage();
   const { soundEnabled, toggleSound } = useSoundContext();
   const { resetTour } = useTour();
+
+  useEffect(() => {
+    return subscribeToUserSession((session) => {
+      setIsLoggedIn(session.isLoggedIn);
+      setUsername(session.username);
+    });
+  }, []);
 
   const toggleLanguage = () => {
     const newLanguage = language === "zh" ? "en" : "zh";
@@ -26,6 +37,11 @@ export default function SettingsDropdown({ toggleModelSidebar }: SettingsDropdow
   const openModelSettings = () => {
     toggleModelSidebar();
     setIsOpen(false);
+  };
+
+  const openUsernameSettings = () => {
+    setIsOpen(false);
+    openLoginModal();
   };
 
   const handleExportData = async () => {
@@ -87,6 +103,29 @@ export default function SettingsDropdown({ toggleModelSidebar }: SettingsDropdow
       {isOpen && (
         <div className="fixed right-3 top-16 z-50 w-56 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-md border border-[#333333] bg-[#1c1c1c] shadow-lg md:absolute md:right-0 md:top-full md:mt-2 md:w-48">
           <div className="py-1">
+            <button
+              onClick={openUsernameSettings}
+              className="flex items-center justify-between w-full gap-3 px-4 py-2 text-sm text-[#f4e8c1] hover:bg-[#252525] transition-colors"
+              title={isLoggedIn && username ? username : t("sidebar.nologin")}
+            >
+              <span className="flex min-w-0 items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 flex-shrink-0">
+                  <path d="M20 21a8 8 0 1 0-16 0"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span className="truncate">
+                  {isLoggedIn ? t("auth.username") : t("sidebar.nologin")}
+                </span>
+              </span>
+              {isLoggedIn && username && (
+                <span className="max-w-[7rem] truncate text-xs text-[#a18d6f]">
+                  {username}
+                </span>
+              )}
+            </button>
+
+            <div className="border-t border-[#333333] my-1"></div>
+
             <button
               onClick={toggleLanguage}
               className="flex items-center w-full px-4 py-2 text-sm text-[#f4e8c1] hover:bg-[#252525] transition-colors"

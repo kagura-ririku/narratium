@@ -22,7 +22,7 @@
  * - CharacterAvatarBackground: For avatar display
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -64,6 +64,22 @@ const CharacterCardCarousel: React.FC<CharacterCardCarouselProps> = ({
   const { t, fontClass, serifFontClass } = useLanguage();
   const [currentCenterIndex, setCurrentCenterIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncViewport = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
 
   // Calculate carousel parameters based on number of cards
   const cardCount = Math.min(characters.length, 8);
@@ -91,6 +107,89 @@ const CharacterCardCarousel: React.FC<CharacterCardCarouselProps> = ({
     setCurrentCenterIndex(prev => (prev - 1 + cardCount) % cardCount);
     setTimeout(() => setIsAnimating(false), 800);
   };
+
+  if (isMobile) {
+    return (
+      <div className="grid grid-cols-2 gap-4">
+        {characters.map((character, index) => (
+          <motion.div
+            key={character.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.04 }}
+            className="min-w-0"
+          >
+            <div className="relative session-card overflow-hidden rounded">
+              <div className="absolute top-2 right-2 flex space-x-1 z-10">
+                <Link
+                  href={`/character?id=${character.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1.5 bg-[#252220] hover:bg-[#3a2a2a] rounded-full text-[#c0a480] hover:text-[#ffd475] transition-colors"
+                  title={t("characterCardsPage.chat")}
+                  aria-label={t("characterCardsPage.chat")}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                </Link>
+                <button
+                  onClick={(e) => {
+                    trackButtonClick("edit_character_btn", "编辑角色");
+                    onEditClick(character, e);
+                  }}
+                  className="p-1.5 bg-[#252220] hover:bg-[#3a2a2a] rounded-full text-[#c0a480] hover:text-[#ffd475] transition-colors"
+                  title={t("characterCardsPage.edit")}
+                  aria-label={t("characterCardsPage.edit")}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => {
+                    trackButtonClick("delete_character_btn", "删除角色");
+                    e.stopPropagation();
+                    onDeleteClick(character.id);
+                  }}
+                  className="p-1.5 bg-[#252220] hover:bg-[#3a2a2a] rounded-full text-[#c0a480] hover:text-[#ffd475] transition-colors"
+                  title={t("characterCardsPage.delete")}
+                  aria-label={t("characterCardsPage.delete")}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <Link href={`/character?id=${character.id}`} className="block">
+                <div className="relative aspect-[4/5] w-full overflow-hidden rounded">
+                  {character.avatar_path ? (
+                    <CharacterAvatarBackground avatarPath={character.avatar_path} />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-[#252220]">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-[#534741]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3">
+                  <h2 className={`text-base text-[#eae6db] line-clamp-1 magical-text ${serifFontClass}`}>{character.name}</h2>
+                  <div className={`text-[11px] text-[#a18d6f] mt-1.5 italic ${fontClass}`}>
+                    <span className="inline-block mr-1 opacity-70">✨</span>
+                    <span className="line-clamp-2">{character.personality}</span>
+                  </div>
+                </div>
+              </Link>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-[70vh] max-h-[600px] my-12 pt-40 flex items-center justify-center" style={{ perspective: "1500px" }}>
