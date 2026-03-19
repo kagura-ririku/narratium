@@ -444,7 +444,7 @@ export default function Sidebar({ isOpen, toggleSidebar, openLoginModal }: Sideb
 
         <div>
           <a 
-            href="https://github.com/Narratium/Narratium.ai"
+            href="https://github.com/kagura-ririku/narratium"
             target="_blank"
             rel="noopener noreferrer"
             className={`focus:outline-none group relative overflow-hidden rounded-md w-full transition-all duration-300 ${!isOpen ? "p-2 flex justify-center" : "py-1.5 px-2 flex items-center justify-center"}`}
@@ -496,4 +496,3 @@ export default function Sidebar({ isOpen, toggleSidebar, openLoginModal }: Sideb
     </div>
   );
 }
-
