@@ -63,6 +63,7 @@ function ActiveSwitch({
 export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProps) {
   const { t, fontClass, serifFontClass, language } = useLanguage();
   const sidebarWidthClass = "w-[calc(100vw-0.75rem)] max-w-[22rem] md:w-72 md:max-w-none";
+  const [isMobile, setIsMobile] = useState(false);
 
   const [configs, setConfigs] = useState<ApiConfig[]>([]);
   const [activeConfigId, setActiveConfigId] = useState("");
@@ -81,6 +82,21 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
   const [formError, setFormError] = useState("");
 
   const showForm = isCreating || Boolean(selectedConfigId);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncViewport = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -356,11 +372,32 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
     }));
   };
 
+  const outerClassName = isMobile
+    ? `${sidebarWidthClass} fixed right-0 top-0 bottom-0 z-40 transition-transform duration-300 overflow-hidden ${
+      isOpen ? "translate-x-0" : "translate-x-full pointer-events-none"
+    }`
+    : `h-full transition-all duration-300 overflow-hidden ${isOpen ? sidebarWidthClass : "w-0"}`;
+
+  const innerClassName = isMobile
+    ? "w-full h-full flex flex-col opacity-100"
+    : `${sidebarWidthClass} h-full ${isOpen ? "opacity-100" : "opacity-0"} transition-opacity duration-300 flex flex-col`;
+
   return (
     <div
-      className={`h-full magic-border border-l border-[#534741] breathing-bg text-[#d0d0d0] transition-all duration-300 overflow-hidden ${isOpen ? sidebarWidthClass : "w-0"}`}
+      style={
+        isMobile
+          ? {
+            position: "fixed",
+            right: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 40,
+          }
+          : undefined
+      }
+      className={`${outerClassName} magic-border border-l border-[#534741] breathing-bg text-[#d0d0d0]`}
     >
-      <div className={`${sidebarWidthClass} h-full ${isOpen ? "opacity-100" : "opacity-0"} transition-opacity duration-300 flex flex-col`}>
+      <div className={innerClassName}>
         <div className="flex justify-between items-center p-3 border-b border-[#534741] bg-gradient-to-r from-[#1a1a1a] to-[#2a2a2a]">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 flex items-center justify-center text-[#f4e8c1] bg-[#1c1c1c] rounded-lg border border-[#333333] shadow-inner">

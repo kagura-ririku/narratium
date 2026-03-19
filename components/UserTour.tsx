@@ -134,7 +134,7 @@ export default function UserTour({ steps, isVisible, onComplete, onSkip }: UserT
   const currentStepData = steps[currentStep];
 
   const getTooltipPosition = () => {
-    const tooltipWidth = 320;
+    const tooltipWidth = Math.min(320, window.innerWidth - 32);
     const tooltipHeight = 200;
     const margin = 20;
     const minDistanceFromTarget = 50;
@@ -260,6 +260,8 @@ export default function UserTour({ steps, isVisible, onComplete, onSkip }: UserT
         style={{
           top: tooltipPosition.top,
           left: tooltipPosition.left,
+          width: Math.min(320, window.innerWidth - 32),
+          maxWidth: "calc(100vw - 32px)",
           boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)",
           // 增加渐变效果属性
           transform: "scale(1)",

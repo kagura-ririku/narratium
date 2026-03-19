@@ -29,7 +29,7 @@ pnpm install
 pnpm run dev
 ```
 
-Once the development server starts, visit: [http://localhost:3000](http://localhost:3000)
+Once the development server starts, visit: [http://localhost:5000](http://localhost:5000)
 
 ## Self-packaging
 

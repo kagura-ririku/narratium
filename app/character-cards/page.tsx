@@ -151,7 +151,7 @@ export default function CharacterCards() {
   if (!mounted) return null;
 
   return (
-    <div className="h-full w-full overflow-hidden login-fantasy-bg relative">
+    <div className="h-full w-full overflow-x-hidden overflow-y-hidden login-fantasy-bg relative">
       <div
         className={`absolute inset-0 z-0 opacity-35 transition-opacity duration-500 ${
           imagesLoaded ? "opacity-35" : "opacity-0"

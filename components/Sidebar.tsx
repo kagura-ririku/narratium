@@ -45,14 +45,12 @@ export default function Sidebar({ isOpen, toggleSidebar, openLoginModal }: Sideb
 
   useEffect(() => {
     const checkIfMobile = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
+      setIsMobile(window.innerWidth < 768);
     };
 
     checkIfMobile();
-    
     window.addEventListener("resize", checkIfMobile);
-    
+
     return () => window.removeEventListener("resize", checkIfMobile);
   }, []);
 
@@ -72,7 +70,7 @@ export default function Sidebar({ isOpen, toggleSidebar, openLoginModal }: Sideb
 
   return (
     <div
-      className={`h-full breathing-bg magic-border text-[#d0d0d0] transition-all duration-300 ease-in-out flex flex-col ${isOpen ? "w-72" : "w-16"} z-50`}
+      className={`h-full breathing-bg magic-border text-[#d0d0d0] transition-all duration-300 ease-in-out flex flex-col ${isOpen ? "w-72 z-50" : "w-16 z-50"}`}
     >
       <div className="flex justify-between items-center h-16 py-3 px-4">
         <div className={`logo-magic-container transition-all duration-300 ease-in-out ${isOpen ? "opacity-100 max-w-[200px]" : "opacity-0 max-w-0"}`} style={{ overflow: "hidden", transitionDelay: isOpen ? "0ms" : "0ms" }}>

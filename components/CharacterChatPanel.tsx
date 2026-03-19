@@ -86,26 +86,38 @@ export default function CharacterChatPanel({
 }: Props) {
   const [streamingTarget, setStreamingTarget] = useState<number>(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const hasInitializedStreamingTarget = useRef(false);
 
   useEffect(() => {
     const savedStreaming = localStorage.getItem("streamingEnabled");
-    if (savedStreaming !== null) {
-      const isStreamingEnabled = savedStreaming === "true";
-      if (isStreamingEnabled && messages.length > 0) {
-        setActiveModes(prev => ({
-          ...prev,
-          streaming: true,
-        }));
-        setStreamingTarget(messages.length);
-      } else {
-        setActiveModes(prev => ({
-          ...prev,
-          streaming: false,
-        }));
-        setStreamingTarget(-1);
-      }
+    const isStreamingEnabled = savedStreaming === null ? true : savedStreaming === "true";
+
+    if (savedStreaming === null) {
+      localStorage.setItem("streamingEnabled", "true");
+    }
+
+    setActiveModes(prev => ({
+      ...prev,
+      streaming: isStreamingEnabled,
+    }));
+
+    if (!isStreamingEnabled) {
+      setStreamingTarget(-1);
+      hasInitializedStreamingTarget.current = true;
     }
   }, []);
+
+  useEffect(() => {
+    if (hasInitializedStreamingTarget.current || messages.length === 0) {
+      return;
+    }
+
+    const savedStreaming = localStorage.getItem("streamingEnabled");
+    const isStreamingEnabled = savedStreaming === null ? true : savedStreaming === "true";
+
+    setStreamingTarget(isStreamingEnabled ? messages.length : -1);
+    hasInitializedStreamingTarget.current = true;
+  }, [messages.length]);
 
   const scrollToBottom = () => {
     const el = scrollRef.current;
@@ -146,8 +158,8 @@ export default function CharacterChatPanel({
   }, []);
   
   return (
-    <div className="flex flex-col h-full max-h-screen">
-      <div className="flex-grow overflow-y-auto p-3 sm:p-6 fantasy-scrollbar" ref={scrollRef}>
+    <div className="flex h-full max-h-screen min-w-0 flex-col overflow-x-hidden">
+      <div className="flex-grow overflow-y-auto overflow-x-hidden p-3 sm:p-6 fantasy-scrollbar" ref={scrollRef}>
         <div className="max-w-4xl mx-auto">
           {messages.length === 0 ? (
             <div className="text-center py-12">

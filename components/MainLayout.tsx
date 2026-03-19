@@ -97,18 +97,18 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         onClose={() => setIsLoginModalOpen(false)} 
       />
       <div className="fixed left-0 top-0 h-full z-10">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          toggleSidebar={toggleSidebar} 
-          openLoginModal={() => setIsLoginModalOpen(true)} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          toggleSidebar={toggleSidebar}
+          openLoginModal={() => setIsLoginModalOpen(true)}
         />
       </div>
       <main
-        className={`flex-1 h-full overflow-auto transition-all duration-300
+        className={`flex-1 h-full overflow-y-auto overflow-x-hidden transition-all duration-300
             ${isMobile ? "ml-0 mr-0" : `${sidebarOpen ? "ml-72" : "ml-16"} ${modelSidebarOpen ? "mr-72" : "mr-0"}`}
           `}
       >
-        <div className="h-full relative">
+        <div className="h-full min-w-0 relative overflow-x-hidden">
           <div className="fixed top-3 right-3 z-20 md:absolute md:top-4 md:right-4 md:z-[999]">
             <SettingsDropdown toggleModelSidebar={toggleModelSidebar} />
           </div>

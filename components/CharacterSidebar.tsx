@@ -132,17 +132,17 @@ const CharacterSidebar: React.FC<CharacterSidebarProps> = ({
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
-  
+
     handleResize();
     window.addEventListener("resize", handleResize);
-  
+
     return () => window.removeEventListener("resize", handleResize);
-  }, []);  
+  }, []);
 
   const mobileSidebarClass = isMobile
     ? (isCollapsed
-      ? "fixed inset-y-0 left-0 z-40 w-[85vw] max-w-[20rem] -translate-x-full opacity-0 pointer-events-none text-[13px] leading-tight"
-      : "fixed inset-y-0 left-0 z-40 w-[85vw] max-w-[20rem] translate-x-0 opacity-100 text-[13px] leading-tight shadow-2xl shadow-black/40")
+      ? "hidden"
+      : "!fixed inset-y-0 left-0 z-40 w-[85vw] max-w-[20rem] translate-x-0 opacity-100 text-[13px] leading-tight shadow-2xl shadow-black/40")
     : (isCollapsed
       ? "w-0 p-0 opacity-0 breathing-bg"
       : "w-[18rem] text-[14px] leading-normal breathing-bg");
@@ -151,7 +151,7 @@ const CharacterSidebar: React.FC<CharacterSidebarProps> = ({
     <>      
       <div
         className={`${mobileSidebarClass}
-          relative breathing-bg overflow-y-auto overflow-x-hidden fantasy-scrollbar
+          md:relative breathing-bg overflow-y-auto overflow-x-hidden fantasy-scrollbar
           border-r border-[#42382f]
           h-full flex flex-col
           magic-border transition-all duration-300 ease-in-out`}

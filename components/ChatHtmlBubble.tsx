@@ -544,19 +544,6 @@ window.addEventListener('message', function(e) {
     return () => ro.disconnect();
   }, [onContentChange]);
 
-  useEffect(() => {
-    if (frameRef.current) {
-      const frame = frameRef.current;
-      const doc = frame.contentDocument;
-      if (doc) {
-        doc.body.innerHTML = "";
-        const contentDiv = doc.createElement("div");
-        contentDiv.innerHTML = processedHtml;
-        doc.body.appendChild(contentDiv);
-      }
-    }
-  }, [processedHtml]);
-
   if (showLoader) {
     return (
       <div className="flex flex-col items-center justify-center py-6 px-4">

@@ -29,7 +29,7 @@ export default function CharacterChatHeader({
   const { t } = useLanguage();
 
   return (
-    <div className="bg-[#1a1816] border-b border-[#534741] p-3 pr-14 sm:p-4 md:pr-20 lg:pr-24 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="bg-[#1a1816] border-b border-[#534741] p-3 pr-14 sm:p-4 md:pr-20 lg:pr-24 flex min-w-0 flex-col gap-3 overflow-x-hidden sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center min-w-0 w-full sm:w-auto">
         {sidebarCollapsed && (
           <button
@@ -96,7 +96,7 @@ export default function CharacterChatHeader({
         </div>
       </div>
 
-      <div className="flex w-full gap-2 overflow-x-auto pb-1 sm:w-auto sm:overflow-visible sm:pb-0">
+      <div className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-1 sm:w-auto sm:overflow-visible sm:pb-0">
         <button
           onClick={() => {
             trackButtonClick("page", "切换世界书");

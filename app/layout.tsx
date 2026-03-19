@@ -16,7 +16,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:5000"),
   title: "Narratium - Interactive Storytelling Platform",
   description: "Narratium is an innovative interactive storytelling platform that brings your stories to life. Create, share, and experience unique narratives in a fantasy-themed environment.",
   keywords: "interactive storytelling, narrative platform, fantasy stories, creative writing, story creation",
@@ -90,4 +90,3 @@ export default function RootLayout({
     </html>
   );
 }
-

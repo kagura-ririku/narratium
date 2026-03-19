@@ -89,6 +89,7 @@ export default function CharacterPage() {
   const [userInput, setUserInput] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [viewportReady, setViewportReady] = useState(false);
   const [suggestedInputs, setSuggestedInputs] = useState<string[]>([]);
   const initializationRef = useRef(false);
   const lastIsMobileRef = useRef<boolean | null>(null);
@@ -133,6 +134,7 @@ export default function CharacterPage() {
     };
 
     syncViewport();
+    setViewportReady(true);
     window.addEventListener("resize", syncViewport);
 
     return () => window.removeEventListener("resize", syncViewport);
@@ -572,8 +574,12 @@ export default function CharacterPage() {
     setUserInput(input);
   };
 
+  if (!viewportReady) {
+    return null;
+  }
+
   return (
-    <div className="flex h-full relative fantasy-bg overflow-hidden">
+    <div className="flex h-full w-full min-w-0 relative fantasy-bg overflow-hidden">
       {isMobile && !sidebarCollapsed && (
         <button
           type="button"
@@ -596,7 +602,7 @@ export default function CharacterPage() {
         }}
       />
 
-      <div className="flex-1 min-w-0 fantasy-bg h-full transition-all duration-300 ease-in-out flex flex-col">
+      <div className="flex-1 w-full min-w-0 fantasy-bg h-full transition-all duration-300 ease-in-out flex flex-col overflow-x-hidden">
         <CharacterChatHeader
           character={character}
           serifFontClass={serifFontClass}
