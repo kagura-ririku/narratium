@@ -1,0 +1,52 @@
+{
+  "name": "Narratium",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "lint": "eslint .",
+    "preview": "serve -s out",
+    "test": "vitest",
+    "pake-mac": "pake out/index.html --name Narratium --use-local-file --icon ./public/icon.icns --multi-arch",
+    "pake-win": "pake out/index.html --name Narratium --use-local-file --icon ./public/icon.ico",
+    "pake-linux": "pake out/index.html --name narratium --use-local-file --icon ./public/icon.png"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "framer-motion": "^12.38.0",
+    "gsap": "^3.14.2",
+    "lucide-react": "^0.577.0",
+    "next": "^16.1.7",
+    "png-chunk-text": "^1.0.0",
+    "png-chunks-encode": "^1.0.0",
+    "png-chunks-extract": "^1.0.0",
+    "react": "^19.2.4",
+    "react-color": "^2.19.3",
+    "react-dom": "^19.2.4",
+    "react-hot-toast": "^2.6.0",
+    "react-parallax-tilt": "^1.7.320",
+    "reactflow": "^11.11.4",
+    "uuid": "^13.0.0",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@next/eslint-plugin-next": "^16.1.7",
+    "@tailwindcss/postcss": "^4.2.1",
+    "@types/node": "^25.5.0",
+    "@types/png-chunk-text": "^1.0.3",
+    "@types/png-chunks-encode": "^1.0.2",
+    "@types/png-chunks-extract": "^1.0.2",
+    "@types/react-color": "^3.0.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.1.7",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.0"
+  }
+}

@@ -1,0 +1,245 @@
+name: Build and Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: Narratium-linux
+            asset_name: narratium-linux.tar.gz
+            output_dir: pake/Narratium-linux
+          - os: windows-latest
+            artifact_name: Narratium-windows
+            asset_name: narratium-windows.zip
+            output_dir: pake/Narratium-win32
+          - os: macos-latest
+            artifact_name: Narratium-macos
+            asset_name: narratium-macos.dmg
+            output_dir: pake/Narratium.app
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt update
+        sudo apt install -y libwebkit2gtk-4.1-dev \
+          build-essential \
+          curl \
+          wget \
+          file \
+          libxdo-dev \
+          libssl-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+        run_install: false
+
+    - name: Get pnpm store directory
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+    - name: Setup pnpm cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build Next.js app
+      run: pnpm build
+
+    - name: Install Pake CLI
+      run: npm install -g pake-cli
+
+    - name: Debug - Check icon files
+      if: matrix.os != 'windows-latest'
+      run: |
+        echo "Checking icon files:"
+        ls -la public/
+        echo "Icon file exists:"
+        if [ -f "public/icon.ico" ]; then echo "Yes"; else echo "No"; fi
+        if [ -f "public/icon.png" ]; then echo "Yes"; else echo "No"; fi
+        if [ -f "public/icon.icns" ]; then echo "Yes"; else echo "No"; fi
+
+    - name: Debug - Check icon files (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "Checking icon files:"
+        Get-ChildItem -Path public/
+        echo "Icon file exists:"
+        if (Test-Path -Path "public/icon.ico") { echo "Yes" } else { echo "No" }
+        if (Test-Path -Path "public/icon.png") { echo "Yes" } else { echo "No" }
+        if (Test-Path -Path "public/icon.icns") { echo "Yes" } else { echo "No" }
+
+    - name: Build with Pake (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: pake out/index.html --name Narratium --use-local-file --icon public/icon.png
+
+    - name: Build with Pake (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Create icon directory in case it doesn't exist
+        mkdir -p pake/icons
+        # Copy icon to pake directory
+        Copy-Item "public\icon.ico" "pake\icons\icon.ico" -Force
+        # Run pake with minimal arguments
+        pake out/index.html --name Narratium
+
+    - name: Build with Pake (macOS)
+      if: matrix.os == 'macos-latest'
+      run: pake out/index.html --name Narratium --use-local-file --icon public/icon.icns
+
+    - name: Debug - List files (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        echo "Current directory:"
+        pwd
+        echo "Files in current directory:"
+        ls -la
+        echo "Files in pake directory (if exists):"
+        ls -la pake || echo "pake directory not found"
+        echo "Finding DMG files:"
+        find . -name "*.dmg"
+
+    - name: Package artifacts (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        mkdir -p dist
+        echo "Current directory:"
+        pwd
+        echo "Files in current directory:"
+        ls -la
+        
+        # Look for .deb file
+        if [ -f "pake.deb" ]; then
+          echo "Found pake.deb file, using it as the artifact"
+          cp pake.deb dist/${{ matrix.asset_name }}
+        else
+          # Try to find any .deb file
+          DEB_FILE=$(find . -name "*.deb" | head -n 1)
+          if [ -n "$DEB_FILE" ]; then
+            echo "Found .deb file: $DEB_FILE"
+            cp "$DEB_FILE" dist/${{ matrix.asset_name }}
+          else
+            echo "No .deb file found, trying to find Narratium directory"
+            NARRATIUM_DIR=$(find . -type d -name "Narratium*" | grep -v "node_modules" | head -n 1)
+            if [ -z "$NARRATIUM_DIR" ]; then
+              echo "Error: Could not find Narratium directory or .deb file"
+              exit 1
+            else
+              echo "Found Narratium directory: $NARRATIUM_DIR"
+              tar -czf dist/${{ matrix.asset_name }} "$NARRATIUM_DIR"
+            fi
+          fi
+        fi
+
+    - name: Package artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        mkdir -p dist
+        # Create a temporary directory to store files for zipping
+        New-Item -Path "temp_for_zip" -ItemType Directory -Force
+        
+        # Find the actual MSI file
+        $msiFile = Get-ChildItem -Path "C:\npm\prefix\node_modules\pake-cli\src-tauri\target\release\bundle\msi\*.msi" -File | Select-Object -First 1
+        if ($msiFile) {
+          echo "Found MSI file: $($msiFile.FullName)"
+          # Copy MSI to temp directory
+          Copy-Item $msiFile.FullName -Destination "temp_for_zip\Narratium.msi"
+          
+          # Look for any other related files like exe
+          $exeFile = Get-ChildItem -Path "C:\npm\prefix\node_modules\pake-cli\src-tauri\target\release\*.exe" -File | Select-Object -First 1
+          if ($exeFile) {
+            echo "Found EXE file: $($exeFile.FullName)"
+            Copy-Item $exeFile.FullName -Destination "temp_for_zip\Narratium.exe"
+          }
+          
+          # Create readme file
+          Set-Content -Path "temp_for_zip\README.txt" -Value "Narratium Windows Installation`n`nThis package contains:`n- Narratium.msi: Windows installer`n`nTo install, double-click the MSI file."
+          
+          # Create ZIP file
+          Compress-Archive -Path "temp_for_zip\*" -DestinationPath "dist\${{ matrix.asset_name }}" -Force
+        } else {
+          # Fallback search
+          $msiFile = Get-ChildItem -Path . -Recurse -Filter "*.msi" | Where-Object { $_.FullName -like "*Narratium*.msi" } | Select-Object -First 1
+          if ($msiFile) {
+            echo "Found MSI file via fallback search: $($msiFile.FullName)"
+            # Copy MSI to temp directory
+            Copy-Item $msiFile.FullName -Destination "temp_for_zip\Narratium.msi"
+            
+            # Create readme file
+            Set-Content -Path "temp_for_zip\README.txt" -Value "Narratium Windows Installation`n`nThis package contains:`n- Narratium.msi: Windows installer`n`nTo install, double-click the MSI file."
+            
+            # Create ZIP file
+            Compress-Archive -Path "temp_for_zip\*" -DestinationPath "dist\${{ matrix.asset_name }}" -Force
+          } else {
+            echo "Error: Could not find MSI file"
+            exit 1
+          }
+        }
+
+    - name: Package artifacts (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        mkdir -p dist
+        # Find the DMG file and copy it
+        DMG_FILE=$(find . -name "Narratium*.dmg" | head -n 1)
+        if [ -z "$DMG_FILE" ]; then
+          echo "Error: DMG file not found"
+          exit 1
+        else
+          echo "Found DMG file: $DMG_FILE"
+          cp "$DMG_FILE" dist/${{ matrix.asset_name }}
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: dist/${{ matrix.asset_name }}
+        retention-days: 30
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/Narratium-linux/narratium-linux.tar.gz
+            artifacts/Narratium-windows/narratium-windows.zip
+            artifacts/Narratium-macos/narratium-macos.dmg
+          draft: false
+          prerelease: false 
