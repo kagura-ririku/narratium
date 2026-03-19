@@ -1,5 +1,6 @@
 import { NodeTool } from "@/lib/nodeflow/NodeTool";
 import { invokeOpenAIResponses } from "@/utils/openai-responses";
+import { ReasoningEffort } from "@/utils/api-config";
 
 export interface LLMConfig {
   modelName: string;
@@ -15,6 +16,7 @@ export interface LLMConfig {
   streaming?: boolean;
   streamUsage?: boolean;
   language?: "zh" | "en";
+  reasoningEffort?: ReasoningEffort;
 }
 export class LLMNodeTools extends NodeTool {
   protected static readonly toolType: string = "llm";
@@ -48,17 +50,17 @@ export class LLMNodeTools extends NodeTool {
     systemMessage: string,
     userMessage: string,
     config: LLMConfig,
-  ): Promise<string> {
+  ): Promise<Awaited<ReturnType<typeof invokeOpenAIResponses>>> {
     try {
-      const response = await invokeOpenAIResponses({
+      return await invokeOpenAIResponses({
         baseUrl: config.baseUrl || "",
         apiKey: config.apiKey || "",
         model: config.modelName || "",
         systemMessage,
         userMessage,
         temperature: config.temperature,
+        reasoningEffort: config.reasoningEffort,
       });
-      return response.text;
     } catch (error) {
       this.handleError(error as Error, "invokeLLM");
     }

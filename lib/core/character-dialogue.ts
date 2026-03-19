@@ -14,6 +14,7 @@ export class CharacterDialogue {
     apiKey: string;
     baseUrl: string;
     temperature: number;
+    reasoningEffort?: DialogueOptions["reasoningEffort"];
   } | null;
   language: "zh" | "en" = "zh";
   promptType: PromptType = PromptType.COMPANION;
@@ -61,6 +62,7 @@ export class CharacterDialogue {
       modelName,
       apiKey,
       baseUrl,
+      reasoningEffort,
       temperature = 0.7,
     } = options;
 
@@ -113,6 +115,7 @@ export class CharacterDialogue {
       apiKey: safeApiKey,
       baseUrl,
       temperature: llmSettings.temperature,
+      reasoningEffort,
     };
   }
   
@@ -136,6 +139,7 @@ export class CharacterDialogue {
         systemMessage: "",
         userMessage: userPrompt,
         temperature: this.llm.temperature,
+        reasoningEffort: this.llm.reasoningEffort,
       });
 
       return compressedStory.text;

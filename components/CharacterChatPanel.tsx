@@ -23,6 +23,7 @@
 import { useEffect, useRef, useState } from "react";
 import ChatHtmlBubble from "@/components/ChatHtmlBubble";
 import { CharacterAvatarBackground } from "@/components/CharacterAvatarBackground";
+import { ParsedResponse, ResponseUsageMetrics } from "@/lib/models/parsed-response";
 import { trackButtonClick, trackFormSubmit } from "@/utils/google-analytics";
 
 /**
@@ -41,6 +42,7 @@ interface Message {
   content: string;
   timestamp?: string;
   isUser?: boolean;
+  parsedContent?: ParsedResponse | null;
 }
 
 interface Props {
@@ -135,6 +137,22 @@ export default function CharacterChatPanel({
   };
 
   const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(false);
+
+  const formatResponseMeta = (usage?: ResponseUsageMetrics | null) => {
+    if (!usage) {
+      return "";
+    }
+
+    const durationSeconds = usage.durationMs / 1000;
+    const formattedInputTokens = new Intl.NumberFormat("en-US").format(usage.inputTokens);
+    const formattedOutputTokens = new Intl.NumberFormat("en-US").format(usage.outputTokens);
+    const formattedDuration = durationSeconds >= 10 ? durationSeconds.toFixed(1) : durationSeconds.toFixed(2);
+    const formattedSpeed = usage.tokensPerSecond >= 100
+      ? usage.tokensPerSecond.toFixed(0)
+      : usage.tokensPerSecond.toFixed(1);
+
+    return `Input ${formattedInputTokens} | Completion ${formattedOutputTokens} | Time ${formattedDuration}s | Speed ${formattedSpeed} token/s`;
+  };
 
   const shouldShowRegenerateButton = (message: Message, index: number) => {
     if (isSending) return false;
@@ -364,6 +382,11 @@ export default function CharacterChatPanel({
                         </button>
                       </div>
                     </div>
+                    {message.parsedContent?.usage && (
+                      <div className="pl-10 mb-3 text-[11px] leading-5 text-[#8a8177]">
+                        {formatResponseMeta(message.parsedContent.usage)}
+                      </div>
+                    )}
                     <ChatHtmlBubble
                       key={message.id}
                       html={message.content}

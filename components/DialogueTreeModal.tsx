@@ -635,6 +635,7 @@ export default function DialogueTreeModal({ isOpen, onClose, characterId, onDial
           base_url: activeConfig.baseUrl,
           llm_type: "openai",
           language: language,
+          reasoning_effort: activeConfig.reasoningEffortEnabled ? activeConfig.reasoningEffort : undefined,
         });
         
         if (!response.success) {

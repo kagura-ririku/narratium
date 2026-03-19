@@ -21,6 +21,7 @@ export class RegexNode extends NodeBase {
   protected async _call(input: NodeInput): Promise<NodeOutput> {
     let llmResponse = input.llmResponse;
     const characterId = input.characterId;
+    const responseUsage = input.responseUsage;
 
     if (!llmResponse) {
       throw new Error("LLM response is required for RegexNode");
@@ -76,6 +77,7 @@ export class RegexNode extends NodeBase {
       fullResponse: llmResponse,
       nextPrompts,
       event,
+      responseUsage,
       characterId,
     };
   }

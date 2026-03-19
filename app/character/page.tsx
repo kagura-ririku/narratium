@@ -29,6 +29,7 @@ import { useSearchParams } from "next/navigation";
 import { useLanguage } from "@/app/i18n";
 import CharacterSidebar from "@/components/CharacterSidebar";
 import { PromptType } from "@/lib/models/character-prompts-model";
+import { ParsedResponse } from "@/lib/models/parsed-response";
 import { v4 as uuidv4 } from "uuid";
 import { initCharacterDialogue } from "@/function/dialogue/init";
 import { getCharacterDialogue } from "@/function/dialogue/info";
@@ -59,6 +60,7 @@ interface Message {
   role: string;
   content: string;
   timestamp?: string;
+  parsedContent?: ParsedResponse | null;
 }
 
 /**
@@ -195,6 +197,7 @@ export default function CharacterPage() {
             role: msg.role == "system" ? "assistant" : msg.role,
             content: msg.content,
             timestamp: msg.timestamp || new Date(dialogue.created_at).toISOString(),
+            parsedContent: msg.parsedContent || null,
           }));
 
           setMessages(formattedMessages);
@@ -259,6 +262,7 @@ export default function CharacterPage() {
             role: msg.role == "system" ? "assistant" : msg.role,
             content: msg.content,
             timestamp: msg.timestamp || new Date(dialogue.created_at).toISOString(),
+            parsedContent: msg.parsedContent || null,
           }));
 
           setMessages(formattedMessages);
@@ -300,6 +304,7 @@ export default function CharacterPage() {
           role: msg.role,
           content: msg.content,
           timestamp: msg.timestamp || new Date(dialogue.created_at).toISOString(),
+          parsedContent: msg.parsedContent || null,
         }));
         setMessages(formattedMessages);
         setSuggestedInputs(dialogue.messages[dialogue.messages.length - 1].parsedContent?.nextPrompts || []);
@@ -342,6 +347,7 @@ export default function CharacterPage() {
             role: msg.role,
             content: msg.content,
             timestamp: new Date(dialogue.created_at).toISOString(),
+            parsedContent: msg.parsedContent || null,
           }));
           setMessages(formattedMessages);
           setSuggestedInputs(dialogue.messages[dialogue.messages.length - 1].parsedContent?.nextPrompts || []);
@@ -435,6 +441,7 @@ export default function CharacterPage() {
         baseUrl: activeConfig.baseUrl,
         apiKey: activeConfig.apiKey,
         llmType: "openai",
+        reasoningEffort: activeConfig.reasoningEffortEnabled ? activeConfig.reasoningEffort : undefined,
         language: language as "zh" | "en",
         streaming: true,
         promptType: promptType as PromptType,
@@ -455,6 +462,7 @@ export default function CharacterPage() {
           role: "assistant",
           content: result.content || "",
           timestamp: new Date().toISOString(),
+          parsedContent: result.parsedContent || null,
         };
         setMessages(prev => [...prev, assistantMessage]);
         

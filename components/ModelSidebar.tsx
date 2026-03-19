@@ -7,12 +7,14 @@ import { trackButtonClick } from "@/utils/google-analytics";
 import {
   ApiConfig,
   createEmptyApiConfig,
+  DEFAULT_REASONING_EFFORT,
   DEFAULT_OPENAI_BASE_URL,
   getOpenAIModelsEndpoint,
   getActiveApiConfig,
   getStoredApiConfigs,
   normalizeBaseUrl,
   persistApiConfigState,
+  ReasoningEffort,
 } from "@/utils/api-config";
 import { invokeOpenAIResponses } from "@/utils/openai-responses";
 
@@ -59,6 +61,13 @@ function ActiveSwitch({
     </button>
   );
 }
+
+const REASONING_EFFORT_OPTIONS: Array<{ label: string; value: ReasoningEffort }> = [
+  { label: "Low", value: "low" },
+  { label: "Medium", value: "medium" },
+  { label: "High", value: "high" },
+  { label: "Extra High", value: "xhigh" },
+];
 
 export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProps) {
   const { t, fontClass, serifFontClass, language } = useLanguage();
@@ -352,6 +361,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
         systemMessage: "You are a connectivity test assistant.",
         userMessage: "Reply with a short confirmation that this configuration works.",
         temperature: 0.1,
+        reasoningEffort: draft.reasoningEffortEnabled ? draft.reasoningEffort : undefined,
       });
 
       setFormError("");
@@ -587,6 +597,40 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
                 {modelListEmpty && (
                   <div className="text-[11px] text-[#8a8a8a]">
                     {t("modelSettings.modelListUnavailable") || "Model list unavailable"}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block text-[#f4e8c1] text-xs font-medium">
+                    Reasoning Effort
+                  </label>
+                  <ActiveSwitch
+                    checked={draft.reasoningEffortEnabled}
+                    onClick={() => updateDraft({
+                      reasoningEffortEnabled: !draft.reasoningEffortEnabled,
+                      reasoningEffort: draft.reasoningEffort || DEFAULT_REASONING_EFFORT,
+                    })}
+                  />
+                </div>
+
+                {draft.reasoningEffortEnabled && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {REASONING_EFFORT_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => updateDraft({ reasoningEffort: option.value })}
+                        className={`rounded-md border px-3 py-2 text-xs transition-all duration-200 ${
+                          draft.reasoningEffort === option.value
+                            ? "border-[#d1a35c] bg-[#3f3831] text-[#f4e8c1] shadow-[0_0_8px_rgba(209,163,92,0.15)]"
+                            : "border-[#4d433a] bg-[#2d2d2d] text-[#b8afa5] hover:border-[#6b5b4a] hover:text-[#f1ede5]"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>

@@ -4,6 +4,7 @@ import { parseEvent } from "@/utils/response-parser";
 import { DialogueNode } from "@/lib/models/node-model";
 import { LocalCharacterRecordOperations } from "@/lib/data/character-record-operation";
 import { Character } from "@/lib/core/character";
+import { ReasoningEffort } from "@/utils/api-config";
 
 interface EditDialogueNodeRequest {
   characterId: string;
@@ -14,6 +15,7 @@ interface EditDialogueNodeRequest {
   base_url: string;
   llm_type: string;
   language: string;
+  reasoning_effort?: ReasoningEffort;
 }
 
 export async function editDialaogueNodeContent(input: EditDialogueNodeRequest) {
@@ -26,7 +28,8 @@ export async function editDialaogueNodeContent(input: EditDialogueNodeRequest) {
       api_key,
       base_url,
       llm_type,
-      language, 
+      language,
+      reasoning_effort,
     } = input;
     
     const dialogueTree = await LocalCharacterDialogueOperations.getDialogueTreeById(characterId);
@@ -49,6 +52,7 @@ export async function editDialaogueNodeContent(input: EditDialogueNodeRequest) {
       baseUrl: base_url,
       llmType: "openai",
       language: language as "zh" | "en",
+      reasoningEffort: reasoning_effort,
     });
     
     let summary = "";

@@ -1,8 +1,8 @@
 import { LocalCharacterDialogueOperations } from "@/lib/data/character-dialogue-operation";
 import { PromptType } from "@/lib/models/character-prompts-model";
-import { ParsedResponse } from "@/lib/models/parsed-response";
+import { ParsedResponse, ResponseUsageMetrics } from "@/lib/models/parsed-response";
 import { DialogueWorkflow, DialogueWorkflowParams } from "@/lib/workflow/examples/DialogueWorkflow";
-import { DEFAULT_RESPONSE_LENGTH, normalizeBaseUrl } from "@/utils/api-config";
+import { DEFAULT_RESPONSE_LENGTH, normalizeBaseUrl, ReasoningEffort } from "@/utils/api-config";
 
 export async function handleCharacterChatRequest(payload: {
   username?: string;
@@ -12,6 +12,7 @@ export async function handleCharacterChatRequest(payload: {
   baseUrl: string;
   apiKey: string;
   llmType?: string;
+  reasoningEffort?: ReasoningEffort;
   streaming?: boolean;
   language?: "zh" | "en";
   promptType?: PromptType;
@@ -28,6 +29,7 @@ export async function handleCharacterChatRequest(payload: {
       baseUrl,
       apiKey,
       llmType = "openai",
+      reasoningEffort,
       language = "zh",
       promptType = PromptType.EXPLICIT || PromptType.CUSTOM || PromptType.COMPANION,
       number = DEFAULT_RESPONSE_LENGTH,
@@ -68,6 +70,7 @@ export async function handleCharacterChatRequest(payload: {
         number,
         promptType,
         fastModel,  
+        reasoningEffort,
       };
       const workflowResult = await workflow.execute(workflowParams);
       
@@ -81,16 +84,17 @@ export async function handleCharacterChatRequest(payload: {
         fullResponse,
         nextPrompts,
         event,
+        responseUsage,
       } = workflowResult.outputData;
 
-      await processPostResponseAsync({ characterId, message, fullResponse, screenContent, event, nextPrompts, nodeId })
+      await processPostResponseAsync({ characterId, message, fullResponse, screenContent, event, nextPrompts, nodeId, responseUsage })
         .catch((e) => console.error("Post-processing error:", e));
 
       return new Response(JSON.stringify({
         type: "complete",
         success: true,
         content: screenContent,
-        parsedContent: { nextPrompts },
+        parsedContent: { nextPrompts, usage: responseUsage },
         isRegexProcessed: true,
       }), {
         headers: {
@@ -131,6 +135,7 @@ async function processPostResponseAsync({
   event,
   nextPrompts,
   nodeId,
+  responseUsage,
 }: {
   characterId: string;
   message: string;
@@ -139,11 +144,13 @@ async function processPostResponseAsync({
   event: string;
   nextPrompts: string[];
   nodeId: string;
+  responseUsage?: ResponseUsageMetrics;
 }) {
   try {
     const parsed: ParsedResponse = {
       regexResult: screenContent,
       nextPrompts,
+      usage: responseUsage,
     };
     const dialogueTree = await LocalCharacterDialogueOperations.getDialogueTreeById(characterId);
     const parentNodeId = dialogueTree ? dialogueTree.current_node_id : "root";

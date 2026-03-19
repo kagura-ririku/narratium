@@ -3,6 +3,9 @@ export const DEFAULT_RESPONSE_LENGTH = 4096;
 export const MIN_RESPONSE_LENGTH = 100;
 const RESPONSE_LENGTH_VERSION_KEY = "responseLengthVersion";
 const RESPONSE_LENGTH_VERSION = "2";
+export const REASONING_EFFORT_VALUES = ["low", "medium", "high", "xhigh"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORT_VALUES)[number];
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "medium";
 
 export interface ApiConfig {
   id: string;
@@ -11,6 +14,8 @@ export interface ApiConfig {
   baseUrl: string;
   model: string;
   apiKey: string;
+  reasoningEffortEnabled: boolean;
+  reasoningEffort: ReasoningEffort;
 }
 
 const isBrowser = () => typeof window !== "undefined";
@@ -24,6 +29,12 @@ export const getOpenAIApiBaseUrl = (value?: string): string => `${normalizeBaseU
 export const getOpenAIModelsEndpoint = (value?: string): string => `${getOpenAIApiBaseUrl(value)}/models`;
 export const getOpenAIResponsesEndpoint = (value?: string): string => `${getOpenAIApiBaseUrl(value)}/responses`;
 
+const sanitizeReasoningEffort = (value?: string): ReasoningEffort => {
+  return REASONING_EFFORT_VALUES.includes((value || "") as ReasoningEffort)
+    ? value as ReasoningEffort
+    : DEFAULT_REASONING_EFFORT;
+};
+
 const sanitizeConfig = (config: Partial<ApiConfig>, index: number): ApiConfig => ({
   id: config.id?.trim() || `api_${Date.now()}_${index}`,
   name: config.name?.trim() || config.model?.trim() || `API Config ${index + 1}`,
@@ -31,6 +42,8 @@ const sanitizeConfig = (config: Partial<ApiConfig>, index: number): ApiConfig =>
   baseUrl: normalizeBaseUrl(config.baseUrl),
   model: config.model?.trim() || "",
   apiKey: config.apiKey?.trim() || "",
+  reasoningEffortEnabled: config.reasoningEffortEnabled === true,
+  reasoningEffort: sanitizeReasoningEffort(config.reasoningEffort),
 });
 
 const migrateLegacyConfig = (storage: Storage): ApiConfig | null => {
@@ -83,6 +96,8 @@ export const createEmptyApiConfig = (): ApiConfig => ({
   baseUrl: DEFAULT_OPENAI_BASE_URL,
   model: "",
   apiKey: "",
+  reasoningEffortEnabled: false,
+  reasoningEffort: DEFAULT_REASONING_EFFORT,
 });
 
 export const getStoredApiConfigs = (): ApiConfig[] => {

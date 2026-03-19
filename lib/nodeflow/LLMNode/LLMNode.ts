@@ -2,6 +2,7 @@ import { NodeBase } from "@/lib/nodeflow/NodeBase";
 import { NodeConfig, NodeInput, NodeOutput, NodeCategory } from "@/lib/nodeflow/types";
 import { LLMNodeTools } from "./LLMNodeTools";
 import { NodeToolRegistry } from "../NodeTool";
+import { ResponseUsageMetrics } from "@/lib/models/parsed-response";
 
 export class LLMNode extends NodeBase {
   static readonly nodeName = "llm";
@@ -36,7 +37,7 @@ export class LLMNode extends NodeBase {
       throw new Error("User message is required for LLMNode");
     }
 
-    const llmResponse = await this.executeTool(
+    const llmResult = await this.executeTool(
       "invokeLLM",
       systemMessage,
       userMessage,
@@ -47,11 +48,13 @@ export class LLMNode extends NodeBase {
         llmType,
         temperature,
         language,
+        reasoningEffort: input.reasoningEffort,
       },
-    ) as string;
+    ) as { text: string; usage: ResponseUsageMetrics };
 
     return {
-      llmResponse,
+      llmResponse: llmResult.text,
+      responseUsage: llmResult.usage,
       systemMessage,
       userMessage,
       modelName,
