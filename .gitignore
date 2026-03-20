@@ -90,3 +90,6 @@ compose.override.yml
 Narratium.dmg
 Narratium.msi
 docker-compose.override.yml
+
+# test
+/test
