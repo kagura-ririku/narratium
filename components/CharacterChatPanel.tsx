@@ -86,9 +86,7 @@ export default function CharacterChatPanel({
   activeModes,
   setActiveModes,
 }: Props) {
-  const [streamingTarget, setStreamingTarget] = useState<number>(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const hasInitializedStreamingTarget = useRef(false);
 
   useEffect(() => {
     const savedStreaming = localStorage.getItem("streamingEnabled");
@@ -102,24 +100,7 @@ export default function CharacterChatPanel({
       ...prev,
       streaming: isStreamingEnabled,
     }));
-
-    if (!isStreamingEnabled) {
-      setStreamingTarget(-1);
-      hasInitializedStreamingTarget.current = true;
-    }
   }, []);
-
-  useEffect(() => {
-    if (hasInitializedStreamingTarget.current || messages.length === 0) {
-      return;
-    }
-
-    const savedStreaming = localStorage.getItem("streamingEnabled");
-    const isStreamingEnabled = savedStreaming === null ? true : savedStreaming === "true";
-
-    setStreamingTarget(isStreamingEnabled ? messages.length : -1);
-    hasInitializedStreamingTarget.current = true;
-  }, [messages.length]);
 
   const scrollToBottom = () => {
     const el = scrollRef.current;
@@ -254,9 +235,7 @@ export default function CharacterChatPanel({
                                   const newStreaming = !prev.streaming;
                                   return { ...prev, streaming: newStreaming };
                                 });
-                                const newStreaming = !activeModes.streaming;
-                                setStreamingTarget(newStreaming ? messages.length : -1);
-                                localStorage.setItem("streamingEnabled", String(newStreaming));
+                                localStorage.setItem("streamingEnabled", String(!activeModes.streaming));
                                 trackButtonClick("toggle_streaming", "流式输出切换");
                               }}
                               className={`mx-1 p-1 rounded-md transition-all duration-300 group relative ${
@@ -393,11 +372,7 @@ export default function CharacterChatPanel({
                       isLoading={
                         isSending && index === messages.length - 1 && message.content.trim() === ""
                       }
-                      enableStreaming={
-                        activeModes.streaming &&
-                        message.role === "assistant" &&
-                        index >= streamingTarget
-                      }
+                      enableStreaming={false}
                       onContentChange={
                         index === messages.length - 1 ? () => maybeScrollToBottom() : undefined
                       }

@@ -2,7 +2,12 @@ import { LocalCharacterDialogueOperations } from "@/lib/data/character-dialogue-
 import { PromptType } from "@/lib/models/character-prompts-model";
 import { ParsedResponse, ResponseUsageMetrics } from "@/lib/models/parsed-response";
 import { DialogueWorkflow, DialogueWorkflowParams } from "@/lib/workflow/examples/DialogueWorkflow";
+import { ContextNodeTools } from "@/lib/nodeflow/ContextNode/ContextNodeTools";
+import { PresetNodeTools } from "@/lib/nodeflow/PresetNode/PresetNodeTools";
+import { RegexNodeTools } from "@/lib/nodeflow/RegexNode/RegexNodeTools";
+import { WorldBookNodeTools } from "@/lib/nodeflow/WorldBookNode/WorldBookNodeTools";
 import { DEFAULT_RESPONSE_LENGTH, normalizeBaseUrl, ReasoningEffort } from "@/utils/api-config";
+import { streamOpenAIResponses } from "@/utils/openai-responses";
 
 export async function handleCharacterChatRequest(payload: {
   username?: string;
@@ -55,6 +60,24 @@ export async function handleCharacterChatRequest(payload: {
     }
 
     try {
+      if (payload.streaming) {
+        return await handleCharacterChatStreamingRequest({
+          username,
+          characterId,
+          message,
+          modelName: modelName.trim(),
+          baseUrl: normalizeBaseUrl(baseUrl),
+          apiKey: apiKey.trim(),
+          llmType: llmType as "openai",
+          language,
+          promptType,
+          number,
+          nodeId,
+          fastModel,
+          reasoningEffort,
+        });
+      }
+
       const workflow = new DialogueWorkflow();
       const workflowParams: DialogueWorkflowParams = {
         characterId,
@@ -125,6 +148,209 @@ export async function handleCharacterChatRequest(payload: {
       },
     });
   }
+}
+
+async function buildDialoguePromptFramework(input: {
+  characterId: string;
+  message: string;
+  language: "zh" | "en";
+  username?: string;
+  number: number;
+  fastModel: boolean;
+}) {
+  const presetResult = await PresetNodeTools.buildPromptFramework(
+    input.characterId,
+    input.language,
+    input.username,
+    undefined,
+    input.number,
+    input.fastModel,
+  );
+
+  const contextResult = await ContextNodeTools.assembleChatHistory(
+    presetResult.userMessage,
+    input.characterId,
+    10,
+  );
+
+  return await WorldBookNodeTools.assemblePromptWithWorldBook(
+    input.characterId,
+    presetResult.systemMessage,
+    contextResult.userMessage,
+    input.message,
+    input.language,
+    5,
+    input.username,
+    undefined,
+  );
+}
+
+function extractVisibleStreamContent(rawResponse: string): string {
+  return rawResponse
+    .replace(/\n*\s*<think>[\s\S]*?(?:<\/think>|$)\s*\n*/g, "")
+    .replace(/\n*\s*<thinking>[\s\S]*?(?:<\/thinking>|$)\s*\n*/g, "")
+    .replace(/\s*<\/?output>\s*/g, "")
+    .replace(/\s*<\/?outputFormat>\s*/g, "")
+    .replace(/\n*\s*<next_prompts>[\s\S]*?(?:<\/next_prompts>|$)\s*\n*/g, "")
+    .replace(/\n*\s*<events>[\s\S]*?(?:<\/events>|$)\s*\n*/g, "")
+    .trim();
+}
+
+async function processDialogueResponse(
+  llmResponse: string,
+  characterId: string,
+): Promise<{
+  fullResponse: string;
+  screenContent: string;
+  nextPrompts: string[];
+  event: string;
+}> {
+  const normalized = llmResponse
+    .replace(/\n*\s*<think>[\s\S]*?<\/think>\s*\n*/g, "")
+    .replace(/\n*\s*<thinking>[\s\S]*?<\/thinking>\s*\n*/g, "")
+    .trim();
+
+  const cleanedResponse = normalized
+    .replace(/\s*<\/?output>\s*/g, "")
+    .replace(/\s*<\/?outputFormat>\s*/g, "")
+    .trim();
+
+  const nextPromptsMatch = cleanedResponse.match(/<next_prompts>([\s\S]*?)<\/next_prompts>/);
+  const nextPrompts = nextPromptsMatch
+    ? nextPromptsMatch[1]
+      .trim()
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => line.replace(/^[-*]\s*/, "").replace(/^\s*\[|\]\s*$/g, "").trim())
+    : [];
+
+  const eventsMatch = cleanedResponse.match(/<events>([\s\S]*?)<\/events>/);
+  const event = eventsMatch ? eventsMatch[1].trim().replace(/\[|\]/g, "") : "";
+
+  const mainContent = cleanedResponse
+    .replace(/\n*\s*<next_prompts>[\s\S]*?<\/next_prompts>\s*\n*/g, "")
+    .replace(/\n*\s*<events>[\s\S]*?<\/events>\s*\n*/g, "")
+    .trim();
+
+  const processedRegex = await RegexNodeTools.processRegex(mainContent, characterId);
+
+  return {
+    fullResponse: normalized,
+    screenContent: processedRegex.replacedText,
+    nextPrompts,
+    event,
+  };
+}
+
+async function handleCharacterChatStreamingRequest(payload: {
+  username?: string;
+  characterId: string;
+  message: string;
+  modelName: string;
+  baseUrl: string;
+  apiKey: string;
+  llmType: "openai";
+  language: "zh" | "en";
+  promptType?: PromptType;
+  number: number;
+  nodeId: string;
+  fastModel: boolean;
+  reasoningEffort?: ReasoningEffort;
+}): Promise<Response> {
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: Record<string, any>) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
+
+      try {
+        const promptFramework = await buildDialoguePromptFramework({
+          characterId: payload.characterId,
+          message: payload.message,
+          language: payload.language,
+          username: payload.username,
+          number: payload.number,
+          fastModel: payload.fastModel,
+        });
+
+        let fullResponse = "";
+        let latestVisibleContent = "";
+        let usage: ResponseUsageMetrics | undefined;
+
+        for await (const event of streamOpenAIResponses({
+          baseUrl: payload.baseUrl,
+          apiKey: payload.apiKey,
+          model: payload.modelName,
+          systemMessage: promptFramework.systemMessage,
+          userMessage: promptFramework.userMessage,
+          temperature: 0.7,
+          reasoningEffort: payload.reasoningEffort,
+        })) {
+          if (event.type === "delta") {
+            fullResponse += event.delta;
+            const nextVisibleContent = extractVisibleStreamContent(fullResponse);
+
+            if (nextVisibleContent !== latestVisibleContent) {
+              latestVisibleContent = nextVisibleContent;
+              send({
+                type: "delta",
+                content: latestVisibleContent,
+              });
+            }
+            continue;
+          }
+
+          if (event.type === "completed") {
+            fullResponse = event.text || fullResponse;
+            usage = event.usage;
+          }
+        }
+
+        const processed = await processDialogueResponse(fullResponse, payload.characterId);
+
+        await processPostResponseAsync({
+          characterId: payload.characterId,
+          message: payload.message,
+          fullResponse: processed.fullResponse,
+          screenContent: processed.screenContent,
+          event: processed.event,
+          nextPrompts: processed.nextPrompts,
+          nodeId: payload.nodeId,
+          responseUsage: usage,
+        });
+
+        send({
+          type: "complete",
+          success: true,
+          content: processed.screenContent,
+          parsedContent: {
+            nextPrompts: processed.nextPrompts,
+            usage,
+          },
+          isRegexProcessed: true,
+        });
+      } catch (error: any) {
+        send({
+          type: "error",
+          success: false,
+          message: error?.message || "Unknown error",
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 async function processPostResponseAsync({

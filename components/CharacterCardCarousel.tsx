@@ -24,6 +24,7 @@
 
 import React, { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { useLanguage } from "@/app/i18n";
@@ -62,6 +63,10 @@ const CharacterCardCarousel: React.FC<CharacterCardCarouselProps> = ({
   onDeleteClick,
 }) => {
   const { t, fontClass, serifFontClass } = useLanguage();
+  const router = useRouter();
+  const navigateToCharacter = (characterId: string) => {
+    router.push(`/character?id=${characterId}`);
+  };
   const [currentCenterIndex, setCurrentCenterIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -163,7 +168,18 @@ const CharacterCardCarousel: React.FC<CharacterCardCarouselProps> = ({
                 </button>
               </div>
 
-              <Link href={`/character?id=${character.id}`} className="block">
+              <div
+                role="link"
+                tabIndex={0}
+                onClick={() => navigateToCharacter(character.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    navigateToCharacter(character.id);
+                  }
+                }}
+                className="block w-full text-left cursor-pointer"
+              >
                 <div className="relative aspect-[4/5] w-full overflow-hidden rounded">
                   {character.avatar_path ? (
                     <CharacterAvatarBackground avatarPath={character.avatar_path} />
@@ -183,7 +199,7 @@ const CharacterCardCarousel: React.FC<CharacterCardCarouselProps> = ({
                     <span className="line-clamp-2">{character.personality}</span>
                   </div>
                 </div>
-              </Link>
+              </div>
             </div>
           </motion.div>
         ))}
@@ -293,9 +309,17 @@ const CharacterCardCarousel: React.FC<CharacterCardCarouselProps> = ({
                   </button>
                 </div>
               
-                <Link
-                  href={`/character?id=${character.id}`}
-                  className="block h-full flex flex-col"
+                <div
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigateToCharacter(character.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      navigateToCharacter(character.id);
+                    }
+                  }}
+                  className="block h-full w-full text-left cursor-pointer"
                 >
                   {/* Character avatar */}
                   <div className="relative w-full overflow-hidden rounded aspect-[4/5]">
@@ -353,7 +377,7 @@ const CharacterCardCarousel: React.FC<CharacterCardCarouselProps> = ({
                       </div>
                     )}
                   </div>
-                </Link>
+                </div>
               </div>
             </motion.div>
           );

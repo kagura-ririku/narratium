@@ -406,6 +406,9 @@ export default function CharacterPage() {
   const handleSendMessage = async (message: string) => {
     if (!character || isSending) return;
 
+    let pendingAssistantMessageId = "";
+    let shouldStream = false;
+
     try {
       const activeConfig = getActiveApiConfig();
       if (!activeConfig?.model || !activeConfig?.apiKey) {
@@ -433,6 +436,19 @@ export default function CharacterPage() {
       const responseLength = getStoredResponseLength();
       const nodeId = uuidv4();
       const fastModel = localStorage.getItem("fastModelEnabled") === "true";
+      shouldStream = activeModes.streaming === true;
+      pendingAssistantMessageId = nodeId;
+
+      if (shouldStream) {
+        setMessages(prev => [...prev, {
+          id: nodeId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date().toISOString(),
+          parsedContent: null,
+        }]);
+      }
+
       const response = await handleCharacterChatRequest({
         username,
         characterId: character.id,
@@ -443,7 +459,7 @@ export default function CharacterPage() {
         llmType: "openai",
         reasoningEffort: activeConfig.reasoningEffortEnabled ? activeConfig.reasoningEffort : undefined,
         language: language as "zh" | "en",
-        streaming: true,
+        streaming: shouldStream,
         promptType: promptType as PromptType,
         number: responseLength,
         nodeId,
@@ -452,6 +468,82 @@ export default function CharacterPage() {
 
       if (!response.ok) {
         throw new Error(`Failed to send message: ${response.status}`);
+      }
+
+      const contentType = response.headers.get("Content-Type") || "";
+
+      if (shouldStream && contentType.includes("text/event-stream")) {
+        if (!response.body) {
+          throw new Error(t("game.cannotReadResponseStream") || "Cannot read response stream");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalResult: any = null;
+
+        const updateAssistantMessage = (content: string, parsedContent?: ParsedResponse | null) => {
+          setMessages((prev) => prev.map((item) => (
+            item.id === nodeId
+              ? {
+                ...item,
+                content,
+                parsedContent: parsedContent ?? item.parsedContent ?? null,
+              }
+              : item
+          )));
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split("\n\n");
+          buffer = frames.pop() || "";
+
+          for (const frame of frames) {
+            const dataLines = frame
+              .split("\n")
+              .map((line) => line.trim())
+              .filter((line) => line.startsWith("data:"))
+              .map((line) => line.slice(5).trim())
+              .filter(Boolean);
+
+            if (dataLines.length === 0) {
+              continue;
+            }
+
+            const event = JSON.parse(dataLines.join("\n"));
+
+            if (event.type === "delta") {
+              updateAssistantMessage(event.content || "");
+              continue;
+            }
+
+            if (event.type === "complete") {
+              finalResult = event;
+              updateAssistantMessage(event.content || "", event.parsedContent || null);
+              continue;
+            }
+
+            if (event.type === "error") {
+              throw new Error(event.message || "Failed to get response");
+            }
+          }
+        }
+
+        if (!finalResult?.success) {
+          throw new Error(finalResult?.message || "Failed to get response");
+        }
+
+        if (finalResult.parsedContent?.nextPrompts) {
+          setSuggestedInputs(finalResult.parsedContent.nextPrompts);
+        }
+
+        return;
       }
 
       const result = await response.json();
@@ -474,6 +566,9 @@ export default function CharacterPage() {
       }
     } catch (err) {
       console.error("Error sending message:", err);
+      if (shouldStream && pendingAssistantMessageId) {
+        setMessages((prev) => prev.filter((item) => item.id !== pendingAssistantMessageId));
+      }
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsSending(false);

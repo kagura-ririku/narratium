@@ -24,6 +24,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Tilt from "react-parallax-tilt";
 import { useLanguage } from "@/app/i18n";
@@ -62,6 +63,10 @@ const CharacterCardGrid: React.FC<CharacterCardGridProps> = ({
   onDeleteClick,
 }) => {
   const { t, fontClass, serifFontClass } = useLanguage();
+  const router = useRouter();
+  const navigateToCharacter = (characterId: string) => {
+    router.push(`/character?id=${characterId}`);
+  };
 
   return (
     <motion.div
@@ -133,30 +138,40 @@ const CharacterCardGrid: React.FC<CharacterCardGridProps> = ({
               </div>
             
               {/* Character card content */}
-              <Link
-                href={`/character?id=${character.id}`}
-                className="block h-full flex flex-col"
+              <div
+                role="link"
+                tabIndex={0}
+                onClick={() => navigateToCharacter(character.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    navigateToCharacter(character.id);
+                  }
+                }}
+                className="block h-full w-full text-left cursor-pointer"
               >
-                <div className="relative w-full overflow-hidden rounded aspect-[4/5]">
-                  {character.avatar_path ? (
-                    <CharacterAvatarBackground avatarPath={character.avatar_path} />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-[#252220]">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-[#534741]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
+                <div className="h-full flex flex-col">
+                  <div className="relative w-full overflow-hidden rounded aspect-[4/5]">
+                    {character.avatar_path ? (
+                      <CharacterAvatarBackground avatarPath={character.avatar_path} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-[#252220]">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-[#534741]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
               
-                <div className="p-4">
-                  <h2 className={`text-lg text-[#eae6db] line-clamp-1 magical-text ${serifFontClass}`}>{character.name}</h2>
-                  <div className={`text-xs text-[#a18d6f] mt-2 italic ${fontClass}`}>
-                    <span className="inline-block mr-1 opacity-70">✨</span>
-                    <span className="line-clamp-2">{character.personality}</span>
+                  <div className="p-4">
+                    <h2 className={`text-lg text-[#eae6db] line-clamp-1 magical-text ${serifFontClass}`}>{character.name}</h2>
+                    <div className={`text-xs text-[#a18d6f] mt-2 italic ${fontClass}`}>
+                      <span className="inline-block mr-1 opacity-70">✨</span>
+                      <span className="line-clamp-2">{character.personality}</span>
+                    </div>
                   </div>
                 </div>
-              </Link>
+              </div>
             </div>
           </Tilt>
         </motion.div>
