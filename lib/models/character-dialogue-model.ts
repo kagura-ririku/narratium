@@ -1,6 +1,6 @@
 import { ParsedResponse } from "@/lib/models/parsed-response";
 import { PromptType } from "@/lib/models/character-prompts-model";
-import { ReasoningEffort } from "@/utils/api-config";
+import { ApiProvider, ReasoningEffort } from "@/utils/api-config";
 
 export interface DialogueMessage {
   role: "user" | "assistant" | "system" | "sample";
@@ -13,7 +13,7 @@ export interface DialogueOptions {
   modelName: string;
   apiKey: string;
   baseUrl: string;
-  llmType?: "openai";
+  llmType?: ApiProvider;
   reasoningEffort?: ReasoningEffort;
   temperature?: number;
   maxTokens?: number;

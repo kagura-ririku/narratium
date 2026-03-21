@@ -633,7 +633,7 @@ export default function DialogueTreeModal({ isOpen, onClose, characterId, onDial
           model_name: activeConfig.model,
           api_key: activeConfig.apiKey,
           base_url: activeConfig.baseUrl,
-          llm_type: "openai",
+          llm_type: activeConfig.type,
           language: language,
           reasoning_effort: activeConfig.reasoningEffortEnabled ? activeConfig.reasoningEffort : undefined,
         });

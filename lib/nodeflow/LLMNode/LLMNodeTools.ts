@@ -1,12 +1,12 @@
 import { NodeTool } from "@/lib/nodeflow/NodeTool";
-import { invokeOpenAIResponses } from "@/utils/openai-responses";
-import { ReasoningEffort } from "@/utils/api-config";
+import { invokeLLM as invokeLLMApi } from "@/utils/llm-api";
+import { ApiProvider, DEFAULT_RESPONSE_LENGTH, ReasoningEffort } from "@/utils/api-config";
 
 export interface LLMConfig {
   modelName: string;
   apiKey: string;
   baseUrl?: string;
-  llmType?: "openai";
+  llmType?: ApiProvider;
   temperature?: number;
   maxTokens?: number;
   maxRetries?: number;
@@ -50,14 +50,16 @@ export class LLMNodeTools extends NodeTool {
     systemMessage: string,
     userMessage: string,
     config: LLMConfig,
-  ): Promise<Awaited<ReturnType<typeof invokeOpenAIResponses>>> {
+  ): Promise<Awaited<ReturnType<typeof invokeLLMApi>>> {
     try {
-      return await invokeOpenAIResponses({
+      return await invokeLLMApi({
+        provider: config.llmType || "openai",
         baseUrl: config.baseUrl || "",
         apiKey: config.apiKey || "",
         model: config.modelName || "",
         systemMessage,
         userMessage,
+        maxTokens: config.maxTokens || DEFAULT_RESPONSE_LENGTH,
         temperature: config.temperature,
         reasoningEffort: config.reasoningEffort,
       });

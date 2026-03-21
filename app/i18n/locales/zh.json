@@ -54,6 +54,7 @@
     "configurations": "API 配置",
     "newConfig": "新建配置",
     "configName": "配置名称",
+    "apiFormat": "API 格式",
     "configNamePlaceholder": "我的 API 配置",
     "createConfig": "创建配置",
     "nameRequired": "名称不能为空",

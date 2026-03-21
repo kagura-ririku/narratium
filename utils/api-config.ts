@@ -1,16 +1,28 @@
 export const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com";
+export const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+export const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 export const DEFAULT_RESPONSE_LENGTH = 4096;
 export const MIN_RESPONSE_LENGTH = 100;
 const RESPONSE_LENGTH_VERSION_KEY = "responseLengthVersion";
 const RESPONSE_LENGTH_VERSION = "2";
-export const REASONING_EFFORT_VALUES = ["low", "medium", "high", "xhigh"] as const;
-export type ReasoningEffort = (typeof REASONING_EFFORT_VALUES)[number];
-export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "medium";
+export const API_PROVIDER_VALUES = ["openai", "anthropic", "gemini"] as const;
+export type ApiProvider = (typeof API_PROVIDER_VALUES)[number];
+export const OPENAI_REASONING_EFFORT_VALUES = ["low", "medium", "high", "xhigh"] as const;
+export const ANTHROPIC_REASONING_EFFORT_VALUES = ["low", "medium", "high", "max"] as const;
+export const GEMINI_THINKING_LEVEL_VALUES = ["minimal", "low", "medium", "high"] as const;
+export type OpenAIReasoningEffort = (typeof OPENAI_REASONING_EFFORT_VALUES)[number];
+export type AnthropicReasoningEffort = (typeof ANTHROPIC_REASONING_EFFORT_VALUES)[number];
+export type GeminiThinkingLevel = (typeof GEMINI_THINKING_LEVEL_VALUES)[number];
+export type ReasoningEffort = OpenAIReasoningEffort | AnthropicReasoningEffort | GeminiThinkingLevel;
+export const DEFAULT_OPENAI_REASONING_EFFORT: OpenAIReasoningEffort = "medium";
+export const DEFAULT_ANTHROPIC_REASONING_EFFORT: AnthropicReasoningEffort = "high";
+export const DEFAULT_GEMINI_THINKING_LEVEL: GeminiThinkingLevel = "high";
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = DEFAULT_OPENAI_REASONING_EFFORT;
 
 export interface ApiConfig {
   id: string;
   name: string;
-  type: "openai";
+  type: ApiProvider;
   baseUrl: string;
   model: string;
   apiKey: string;
@@ -21,30 +33,98 @@ export interface ApiConfig {
 const isBrowser = () => typeof window !== "undefined";
 
 export const normalizeBaseUrl = (value?: string): string => {
-  const trimmed = (value?.trim() || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
-  return trimmed.replace(/\/v1(?:\/(?:responses|models))?$/i, "");
+  const trimmed = (value?.trim() || "").replace(/\/+$/, "");
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.replace(/\/v1(?:beta)?(?:\/.*)?$/i, "");
 };
 
-export const getOpenAIApiBaseUrl = (value?: string): string => `${normalizeBaseUrl(value)}/v1`;
+export const getDefaultBaseUrl = (provider: ApiProvider): string => (
+  provider === "anthropic"
+    ? DEFAULT_ANTHROPIC_BASE_URL
+    : provider === "gemini"
+      ? DEFAULT_GEMINI_BASE_URL
+      : DEFAULT_OPENAI_BASE_URL
+);
+
+export const getOpenAIApiBaseUrl = (value?: string): string => `${normalizeBaseUrl(value) || DEFAULT_OPENAI_BASE_URL}/v1`;
 export const getOpenAIModelsEndpoint = (value?: string): string => `${getOpenAIApiBaseUrl(value)}/models`;
 export const getOpenAIResponsesEndpoint = (value?: string): string => `${getOpenAIApiBaseUrl(value)}/responses`;
+export const getAnthropicApiBaseUrl = (value?: string): string => `${normalizeBaseUrl(value) || DEFAULT_ANTHROPIC_BASE_URL}/v1`;
+export const getAnthropicModelsEndpoint = (value?: string): string => `${getAnthropicApiBaseUrl(value)}/models`;
+export const getAnthropicMessagesEndpoint = (value?: string): string => `${getAnthropicApiBaseUrl(value)}/messages`;
+export const getGeminiApiBaseUrl = (value?: string): string => `${normalizeBaseUrl(value) || DEFAULT_GEMINI_BASE_URL}/v1beta`;
+export const getGeminiModelsEndpoint = (value?: string): string => `${getGeminiApiBaseUrl(value)}/models`;
+export const getGeminiGenerateContentEndpoint = (value: string | undefined, model: string): string => {
+  const normalizedModel = model.trim().replace(/^models\//i, "");
+  return `${getGeminiApiBaseUrl(value)}/models/${normalizedModel}:generateContent`;
+};
+export const getGeminiStreamGenerateContentEndpoint = (value: string | undefined, model: string): string => {
+  const normalizedModel = model.trim().replace(/^models\//i, "");
+  return `${getGeminiApiBaseUrl(value)}/models/${normalizedModel}:streamGenerateContent?alt=sse`;
+};
+export const getModelListEndpoint = (provider: ApiProvider, value?: string): string => (
+  provider === "anthropic"
+    ? getAnthropicModelsEndpoint(value)
+    : provider === "gemini"
+      ? getGeminiModelsEndpoint(value)
+      : getOpenAIModelsEndpoint(value)
+);
+export const getApiPathSuffix = (provider: ApiProvider): string => (
+  provider === "anthropic"
+    ? "/v1/messages"
+    : provider === "gemini"
+      ? "/v1beta/models/{model}:generateContent"
+      : "/v1/responses"
+);
 
-const sanitizeReasoningEffort = (value?: string): ReasoningEffort => {
-  return REASONING_EFFORT_VALUES.includes((value || "") as ReasoningEffort)
-    ? value as ReasoningEffort
-    : DEFAULT_REASONING_EFFORT;
+export const getDefaultReasoningEffort = (provider: ApiProvider): ReasoningEffort => (
+  provider === "anthropic"
+    ? DEFAULT_ANTHROPIC_REASONING_EFFORT
+    : provider === "gemini"
+      ? DEFAULT_GEMINI_THINKING_LEVEL
+      : DEFAULT_OPENAI_REASONING_EFFORT
+);
+
+export const sanitizeProvider = (value?: string): ApiProvider => {
+  return API_PROVIDER_VALUES.includes((value || "") as ApiProvider)
+    ? value as ApiProvider
+    : "openai";
 };
 
-const sanitizeConfig = (config: Partial<ApiConfig>, index: number): ApiConfig => ({
-  id: config.id?.trim() || `api_${Date.now()}_${index}`,
-  name: config.name?.trim() || config.model?.trim() || `API Config ${index + 1}`,
-  type: "openai",
-  baseUrl: normalizeBaseUrl(config.baseUrl),
-  model: config.model?.trim() || "",
-  apiKey: config.apiKey?.trim() || "",
-  reasoningEffortEnabled: config.reasoningEffortEnabled === true,
-  reasoningEffort: sanitizeReasoningEffort(config.reasoningEffort),
-});
+export const sanitizeReasoningEffort = (value: string | undefined, provider: ApiProvider): ReasoningEffort => {
+  if (provider === "anthropic") {
+    return ANTHROPIC_REASONING_EFFORT_VALUES.includes((value || "") as AnthropicReasoningEffort)
+      ? value as AnthropicReasoningEffort
+      : DEFAULT_ANTHROPIC_REASONING_EFFORT;
+  }
+
+  if (provider === "gemini") {
+    return GEMINI_THINKING_LEVEL_VALUES.includes((value || "") as GeminiThinkingLevel)
+      ? value as GeminiThinkingLevel
+      : DEFAULT_GEMINI_THINKING_LEVEL;
+  }
+
+  return OPENAI_REASONING_EFFORT_VALUES.includes((value || "") as OpenAIReasoningEffort)
+    ? value as OpenAIReasoningEffort
+    : DEFAULT_OPENAI_REASONING_EFFORT;
+};
+
+const sanitizeConfig = (config: Partial<ApiConfig>, index: number): ApiConfig => {
+  const type = sanitizeProvider(config.type);
+
+  return {
+    id: config.id?.trim() || `api_${Date.now()}_${index}`,
+    name: config.name?.trim() || config.model?.trim() || `API Config ${index + 1}`,
+    type,
+    baseUrl: normalizeBaseUrl(config.baseUrl) || getDefaultBaseUrl(type),
+    model: config.model?.trim() || "",
+    apiKey: config.apiKey?.trim() || "",
+    reasoningEffortEnabled: config.reasoningEffortEnabled === true,
+    reasoningEffort: sanitizeReasoningEffort(config.reasoningEffort, type),
+  };
+};
 
 const migrateLegacyConfig = (storage: Storage): ApiConfig | null => {
   const baseUrl = storage.getItem("openaiBaseUrl") || storage.getItem("modelBaseUrl") || "";
@@ -69,7 +149,7 @@ const migrateLegacyConfig = (storage: Storage): ApiConfig | null => {
 };
 
 const writeLegacyKeys = (storage: Storage, config: ApiConfig | null) => {
-  storage.setItem("llmType", "openai");
+  storage.setItem("llmType", config?.type || "openai");
 
   if (!config) {
     storage.removeItem("openaiBaseUrl");
@@ -81,23 +161,30 @@ const writeLegacyKeys = (storage: Storage, config: ApiConfig | null) => {
     return;
   }
 
-  storage.setItem("openaiBaseUrl", normalizeBaseUrl(config.baseUrl));
-  storage.setItem("openaiModel", config.model);
-  storage.setItem("openaiApiKey", config.apiKey);
+  if (config.type === "openai") {
+    storage.setItem("openaiBaseUrl", normalizeBaseUrl(config.baseUrl) || DEFAULT_OPENAI_BASE_URL);
+    storage.setItem("openaiModel", config.model);
+    storage.setItem("openaiApiKey", config.apiKey);
+  } else {
+    storage.removeItem("openaiBaseUrl");
+    storage.removeItem("openaiModel");
+    storage.removeItem("openaiApiKey");
+  }
+
   storage.setItem("apiKey", config.apiKey);
-  storage.setItem("modelBaseUrl", normalizeBaseUrl(config.baseUrl));
+  storage.setItem("modelBaseUrl", normalizeBaseUrl(config.baseUrl) || getDefaultBaseUrl(config.type));
   storage.setItem("modelName", config.model);
 };
 
-export const createEmptyApiConfig = (): ApiConfig => ({
+export const createEmptyApiConfig = (type: ApiProvider = "openai"): ApiConfig => ({
   id: `api_${Date.now()}`,
   name: "",
-  type: "openai",
-  baseUrl: DEFAULT_OPENAI_BASE_URL,
+  type,
+  baseUrl: getDefaultBaseUrl(type),
   model: "",
   apiKey: "",
   reasoningEffortEnabled: false,
-  reasoningEffort: DEFAULT_REASONING_EFFORT,
+  reasoningEffort: getDefaultReasoningEffort(type),
 });
 
 export const getStoredApiConfigs = (): ApiConfig[] => {

@@ -4,7 +4,7 @@ import { parseEvent } from "@/utils/response-parser";
 import { DialogueNode } from "@/lib/models/node-model";
 import { LocalCharacterRecordOperations } from "@/lib/data/character-record-operation";
 import { Character } from "@/lib/core/character";
-import { ReasoningEffort } from "@/utils/api-config";
+import { ApiProvider, ReasoningEffort } from "@/utils/api-config";
 
 interface EditDialogueNodeRequest {
   characterId: string;
@@ -13,7 +13,7 @@ interface EditDialogueNodeRequest {
   model_name: string;
   api_key: string;
   base_url: string;
-  llm_type: string;
+  llm_type: ApiProvider;
   language: string;
   reasoning_effort?: ReasoningEffort;
 }
@@ -50,7 +50,7 @@ export async function editDialaogueNodeContent(input: EditDialogueNodeRequest) {
       modelName: model_name,
       apiKey: api_key,
       baseUrl: base_url,
-      llmType: "openai",
+      llmType: llm_type,
       language: language as "zh" | "en",
       reasoningEffort: reasoning_effort,
     });

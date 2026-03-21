@@ -1,22 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "@/app/styles/fantasy-ui.css";
 import { useLanguage } from "@/app/i18n";
 import { trackButtonClick } from "@/utils/google-analytics";
 import {
   ApiConfig,
+  ApiProvider,
   createEmptyApiConfig,
-  DEFAULT_REASONING_EFFORT,
+  DEFAULT_ANTHROPIC_BASE_URL,
+  DEFAULT_GEMINI_BASE_URL,
   DEFAULT_OPENAI_BASE_URL,
-  getOpenAIModelsEndpoint,
+  getApiPathSuffix,
   getActiveApiConfig,
+  getDefaultBaseUrl,
+  getDefaultReasoningEffort,
+  getModelListEndpoint,
   getStoredApiConfigs,
   normalizeBaseUrl,
   persistApiConfigState,
   ReasoningEffort,
+  sanitizeReasoningEffort,
 } from "@/utils/api-config";
-import { invokeOpenAIResponses } from "@/utils/openai-responses";
+import { invokeLLM } from "@/utils/llm-api";
 
 interface ModelSidebarProps {
   isOpen: boolean;
@@ -69,6 +75,26 @@ const REASONING_EFFORT_OPTIONS: Array<{ label: string; value: ReasoningEffort }>
   { label: "Extra High", value: "xhigh" },
 ];
 
+const ANTHROPIC_REASONING_EFFORT_OPTIONS: Array<{ label: string; value: ReasoningEffort }> = [
+  { label: "Low", value: "low" },
+  { label: "Medium", value: "medium" },
+  { label: "High", value: "high" },
+  { label: "Max", value: "max" },
+];
+
+const GEMINI_THINKING_LEVEL_OPTIONS: Array<{ label: string; value: ReasoningEffort }> = [
+  { label: "Minimal", value: "minimal" },
+  { label: "Low", value: "low" },
+  { label: "Medium", value: "medium" },
+  { label: "High", value: "high" },
+];
+
+const PROVIDER_OPTIONS: Array<{ label: string; value: ApiProvider }> = [
+  { label: "OpenAI", value: "openai" },
+  { label: "Anthropic", value: "anthropic" },
+  { label: "Gemini", value: "gemini" },
+];
+
 export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProps) {
   const { t, fontClass, serifFontClass, language } = useLanguage();
   const sidebarWidthClass = "w-[calc(100vw-0.75rem)] max-w-[22rem] md:w-72 md:max-w-none";
@@ -79,8 +105,10 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
   const [selectedConfigId, setSelectedConfigId] = useState("");
   const [draft, setDraft] = useState<ApiConfig>(createEmptyApiConfig());
   const [isCreating, setIsCreating] = useState(false);
-  const [openaiModelList, setOpenaiModelList] = useState<string[]>([]);
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [modelListEmpty, setModelListEmpty] = useState(false);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const modelFieldRef = useRef<HTMLDivElement>(null);
 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [getModelListSuccess, setGetModelListSuccess] = useState(false);
@@ -165,9 +193,13 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
   const loadConfigToForm = (config: ApiConfig) => {
     setDraft({
       ...config,
-      baseUrl: normalizeBaseUrl(config.baseUrl),
+      baseUrl: normalizeBaseUrl(config.baseUrl) || getDefaultBaseUrl(config.type),
       apiKey: config.apiKey || "",
+      reasoningEffort: sanitizeReasoningEffort(config.reasoningEffort, config.type),
     });
+    setModelOptions([]);
+    setModelListEmpty(false);
+    setIsModelDropdownOpen(false);
     setFormError("");
   };
 
@@ -195,8 +227,9 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
     const empty = createEmptyApiConfig();
     setDraft(empty);
     setSelectedConfigId("");
-    setOpenaiModelList([]);
+    setModelOptions([]);
     setModelListEmpty(false);
+    setIsModelDropdownOpen(false);
     setFormError("");
     setIsCreating(true);
   };
@@ -281,10 +314,11 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
       ...draft,
       id: isCreating ? createEmptyApiConfig().id : draft.id,
       name: draft.name.trim() || createConfigName(draft.model, configs, draft.id),
-      type: "openai",
-      baseUrl: normalizeBaseUrl(draft.baseUrl),
+      type: draft.type,
+      baseUrl: normalizeBaseUrl(draft.baseUrl) || getDefaultBaseUrl(draft.type),
       model: draft.model.trim(),
       apiKey: draft.apiKey.trim(),
+      reasoningEffort: sanitizeReasoningEffort(draft.reasoningEffort, draft.type),
     };
 
     const nextConfigs = isCreating
@@ -315,10 +349,19 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
     }
 
     try {
-      const response = await fetch(getOpenAIModelsEndpoint(draft.baseUrl), {
-        headers: {
-          Authorization: `Bearer ${trimmedKey}`,
-        },
+      const response = await fetch(getModelListEndpoint(draft.type, draft.baseUrl), {
+        headers: draft.type === "anthropic"
+          ? {
+            "x-api-key": trimmedKey,
+            "anthropic-version": "2023-06-01",
+          }
+          : draft.type === "gemini"
+            ? {
+              "x-goog-api-key": trimmedKey,
+            }
+            : {
+              Authorization: `Bearer ${trimmedKey}`,
+            },
       });
 
       if (!response.ok) {
@@ -326,20 +369,39 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
       }
 
       const data = await response.json();
-      const modelList = Array.isArray(data.data)
-        ? data.data
-          .map((item: { id?: string }) => item.id?.trim() || "")
-          .filter(Boolean)
-        : [];
+      const modelList = draft.type === "gemini"
+        ? (
+          Array.isArray(data.models)
+            ? data.models
+              .filter((item: { supportedGenerationMethods?: string[] }) => (
+                Array.isArray(item.supportedGenerationMethods)
+                && item.supportedGenerationMethods.includes("generateContent")
+              ))
+              .map((item: { baseModelId?: string; name?: string }) => (
+                item.baseModelId?.trim()
+                || item.name?.replace(/^models\//i, "").trim()
+                || ""
+              ))
+              .filter(Boolean)
+            : []
+        )
+        : Array.isArray(data.data)
+          ? data.data
+            .map((item: { id?: string }) => item.id?.trim() || "")
+            .filter(Boolean)
+          : [];
+      const uniqueModelList = Array.from(new Set<string>(modelList));
 
-      setOpenaiModelList(modelList);
-      setModelListEmpty(modelList.length === 0);
+      setModelOptions(uniqueModelList);
+      setModelListEmpty(uniqueModelList.length === 0);
+      setIsModelDropdownOpen(uniqueModelList.length > 0);
       setFormError("");
       flashState(setGetModelListSuccess);
     } catch (error) {
       console.error("Failed to fetch model list:", error);
-      setOpenaiModelList([]);
+      setModelOptions([]);
       setModelListEmpty(true);
+      setIsModelDropdownOpen(false);
       flashState(setGetModelListError);
     }
   };
@@ -354,12 +416,14 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
     setTestModelError(false);
 
     try {
-      await invokeOpenAIResponses({
+      await invokeLLM({
+        provider: draft.type,
         baseUrl: draft.baseUrl,
         apiKey: draft.apiKey,
         model: draft.model,
         systemMessage: "You are a connectivity test assistant.",
         userMessage: "Reply with a short confirmation that this configuration works.",
+        maxTokens: 128,
         temperature: 0.1,
         reasoningEffort: draft.reasoningEffortEnabled ? draft.reasoningEffort : undefined,
       });
@@ -381,6 +445,48 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
       ...patch,
     }));
   };
+
+  const handleProviderChange = (nextProvider: ApiProvider) => {
+    setModelOptions([]);
+    setModelListEmpty(false);
+    setIsModelDropdownOpen(false);
+    setDraft((current) => {
+      const currentBaseUrl = normalizeBaseUrl(current.baseUrl);
+      const shouldReplaceBaseUrl = !currentBaseUrl || currentBaseUrl === getDefaultBaseUrl(current.type);
+
+      return {
+        ...current,
+        type: nextProvider,
+        baseUrl: shouldReplaceBaseUrl ? getDefaultBaseUrl(nextProvider) : currentBaseUrl,
+        reasoningEffort: sanitizeReasoningEffort(current.reasoningEffort, nextProvider),
+      };
+    });
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!modelFieldRef.current?.contains(event.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const providerReasoningOptions = draft.type === "anthropic"
+    ? ANTHROPIC_REASONING_EFFORT_OPTIONS
+    : draft.type === "gemini"
+      ? GEMINI_THINKING_LEVEL_OPTIONS
+      : REASONING_EFFORT_OPTIONS;
+  const reasoningLabel = draft.type === "anthropic"
+    ? "Effort"
+    : draft.type === "gemini"
+      ? "Thinking Level"
+      : "Reasoning Effort";
+  const filteredModelOptions = modelOptions.filter((option) => (
+    !draft.model.trim() || option.toLowerCase().includes(draft.model.trim().toLowerCase())
+  ));
 
   const outerClassName = isMobile
     ? `${sidebarWidthClass} fixed right-0 top-0 bottom-0 z-40 transition-transform duration-300 overflow-hidden ${
@@ -475,6 +581,9 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="text-xs text-[#f4e8c1] truncate">{config.name}</div>
+                          <div className="text-[11px] text-[#8de9c0] truncate mt-1">
+                            {config.type === "anthropic" ? "Anthropic" : config.type === "gemini" ? "Gemini" : "OpenAI"}
+                          </div>
                           <div className="text-[11px] text-[#b8afa5] truncate mt-1">{config.model}</div>
                           <div className="text-[11px] text-[#8a8177] truncate mt-1">{normalizeBaseUrl(config.baseUrl)}</div>
                         </div>
@@ -526,17 +635,47 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
               </div>
 
               <div>
+                <label className={`block text-[#f4e8c1] text-xs font-medium mb-2 ${fontClass}`}>
+                  {t("modelSettings.apiFormat") || "API Format"}
+                </label>
+                <div className="relative">
+                  <select
+                    value={draft.type}
+                    onChange={(event) => handleProviderChange(event.target.value as ApiProvider)}
+                    className={`appearance-none w-full bg-[#2d2d2d] border border-[#4d433a] rounded-md py-2 px-3 pr-9 text-sm text-[#f1ede5] focus:outline-none focus:border-[#d1a35c] transition-colors ${serifFontClass}`}
+                  >
+                    {PROVIDER_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-[#8a8177]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className={`block text-[#f4e8c1] text-xs font-medium ${fontClass}`}>
                     {t("modelSettings.baseUrl")}
                   </label>
-                  <span className="text-[11px] text-[#8a8177]">/v1/responses</span>
+                  <span className="text-[11px] text-[#8a8177]">{getApiPathSuffix(draft.type)}</span>
                 </div>
                 <input
                   type="text"
                   value={draft.baseUrl}
                   onChange={(event) => updateDraft({ baseUrl: event.target.value })}
-                  placeholder={DEFAULT_OPENAI_BASE_URL}
+                  placeholder={
+                    draft.type === "anthropic"
+                      ? DEFAULT_ANTHROPIC_BASE_URL
+                      : draft.type === "gemini"
+                        ? DEFAULT_GEMINI_BASE_URL
+                        : DEFAULT_OPENAI_BASE_URL
+                  }
                   className="w-full bg-[#2d2d2d] border border-[#4d433a] rounded-md py-2 px-3 text-sm text-[#f1ede5] focus:outline-none focus:border-[#d1a35c] transition-colors"
                 />
               </div>
@@ -567,32 +706,59 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
                   </button>
                 </div>
 
-                <input
-                  type="text"
-                  value={draft.model}
-                  onChange={(event) => updateDraft({ model: event.target.value })}
-                  placeholder="kimi-k2.5, gpt-4o-mini, gpt-5-mini..."
-                  className="w-full bg-[#2d2d2d] border border-[#4d433a] rounded-md py-2 px-3 text-sm text-[#f1ede5] focus:outline-none focus:border-[#d1a35c] transition-colors"
-                />
-
-                {openaiModelList.length > 0 && (
-                  <div className="rounded-md border border-[#4d433a] overflow-hidden bg-[#26221f]">
-                    {openaiModelList.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => updateDraft({ model: option })}
-                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                          draft.model === option
-                            ? "bg-[#3f3831] text-[#f4e8c1]"
-                            : "text-[#d0d0d0] hover:bg-[#312b26]"
-                        }`}
-                      >
-                        {option}
-                      </button>
-                    ))}
+                <div ref={modelFieldRef} className="relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={draft.model}
+                      onChange={(event) => {
+                        updateDraft({ model: event.target.value });
+                        if (modelOptions.length > 0) {
+                          setIsModelDropdownOpen(true);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (modelOptions.length > 0) {
+                          setIsModelDropdownOpen(true);
+                        }
+                      }}
+                      placeholder=""
+                      className="w-full bg-[#2d2d2d] border border-[#4d433a] rounded-md py-2 px-3 pr-10 text-sm text-[#f1ede5] focus:outline-none focus:border-[#d1a35c] transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsModelDropdownOpen((current) => !current)}
+                      aria-expanded={isModelDropdownOpen}
+                      className="absolute inset-y-0 right-0 flex items-center justify-center w-10 text-[#b8afa5] hover:text-[#f4e8c1] transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
                   </div>
-                )}
+
+                  {isModelDropdownOpen && modelOptions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-10 rounded-md border border-[#4d433a] overflow-hidden bg-[#26221f] shadow-[0_10px_30px_rgba(0,0,0,0.35)] max-h-56 overflow-y-auto fantasy-scrollbar">
+                      {filteredModelOptions.length > 0 ? filteredModelOptions.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => {
+                            updateDraft({ model: option });
+                            setIsModelDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                            draft.model === option
+                              ? "bg-[#3f3831] text-[#f4e8c1]"
+                              : "text-[#d0d0d0] hover:bg-[#312b26]"
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      )) : null}
+                    </div>
+                  )}
+                </div>
 
                 {modelListEmpty && (
                   <div className="text-[11px] text-[#8a8a8a]">
@@ -604,20 +770,20 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <label className="block text-[#f4e8c1] text-xs font-medium">
-                    Reasoning Effort
+                    {reasoningLabel}
                   </label>
                   <ActiveSwitch
                     checked={draft.reasoningEffortEnabled}
                     onClick={() => updateDraft({
                       reasoningEffortEnabled: !draft.reasoningEffortEnabled,
-                      reasoningEffort: draft.reasoningEffort || DEFAULT_REASONING_EFFORT,
+                      reasoningEffort: draft.reasoningEffort || getDefaultReasoningEffort(draft.type),
                     })}
                   />
                 </div>
 
                 {draft.reasoningEffortEnabled && (
                   <div className="grid grid-cols-2 gap-2">
-                    {REASONING_EFFORT_OPTIONS.map((option) => (
+                    {providerReasoningOptions.map((option) => (
                       <button
                         key={option.value}
                         type="button"

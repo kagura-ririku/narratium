@@ -6,8 +6,8 @@ import { ContextNodeTools } from "@/lib/nodeflow/ContextNode/ContextNodeTools";
 import { PresetNodeTools } from "@/lib/nodeflow/PresetNode/PresetNodeTools";
 import { RegexNodeTools } from "@/lib/nodeflow/RegexNode/RegexNodeTools";
 import { WorldBookNodeTools } from "@/lib/nodeflow/WorldBookNode/WorldBookNodeTools";
-import { DEFAULT_RESPONSE_LENGTH, normalizeBaseUrl, ReasoningEffort } from "@/utils/api-config";
-import { streamOpenAIResponses } from "@/utils/openai-responses";
+import { ApiProvider, DEFAULT_RESPONSE_LENGTH, normalizeBaseUrl, ReasoningEffort } from "@/utils/api-config";
+import { streamLLM } from "@/utils/llm-api";
 
 export async function handleCharacterChatRequest(payload: {
   username?: string;
@@ -16,7 +16,7 @@ export async function handleCharacterChatRequest(payload: {
   modelName: string;
   baseUrl: string;
   apiKey: string;
-  llmType?: string;
+  llmType?: ApiProvider;
   reasoningEffort?: ReasoningEffort;
   streaming?: boolean;
   language?: "zh" | "en";
@@ -49,7 +49,7 @@ export async function handleCharacterChatRequest(payload: {
     if (!modelName?.trim() || !apiKey?.trim()) {
       return new Response(JSON.stringify({
         type: "error",
-        message: "OpenAI API configuration is incomplete. Please set the model and API key in Model Settings.",
+        message: "API configuration is incomplete. Please set the model and API key in Model Settings.",
         success: false,
       }), {
         status: 400,
@@ -68,7 +68,7 @@ export async function handleCharacterChatRequest(payload: {
           modelName: modelName.trim(),
           baseUrl: normalizeBaseUrl(baseUrl),
           apiKey: apiKey.trim(),
-          llmType: llmType as "openai",
+          llmType,
           language,
           promptType,
           number,
@@ -87,7 +87,7 @@ export async function handleCharacterChatRequest(payload: {
         modelName: modelName.trim(),
         apiKey: apiKey.trim(),
         baseUrl: normalizeBaseUrl(baseUrl),
-        llmType: llmType as "openai",
+        llmType,
         temperature: 0.7,
         streaming: false,
         number,
@@ -250,7 +250,7 @@ async function handleCharacterChatStreamingRequest(payload: {
   modelName: string;
   baseUrl: string;
   apiKey: string;
-  llmType: "openai";
+  llmType: ApiProvider;
   language: "zh" | "en";
   promptType?: PromptType;
   number: number;
@@ -280,12 +280,14 @@ async function handleCharacterChatStreamingRequest(payload: {
         let latestVisibleContent = "";
         let usage: ResponseUsageMetrics | undefined;
 
-        for await (const event of streamOpenAIResponses({
+        for await (const event of streamLLM({
+          provider: payload.llmType,
           baseUrl: payload.baseUrl,
           apiKey: payload.apiKey,
           model: payload.modelName,
           systemMessage: promptFramework.systemMessage,
           userMessage: promptFramework.userMessage,
+          maxTokens: payload.number,
           temperature: 0.7,
           reasoningEffort: payload.reasoningEffort,
         })) {

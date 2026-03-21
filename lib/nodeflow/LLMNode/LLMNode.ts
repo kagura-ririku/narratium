@@ -3,6 +3,7 @@ import { NodeConfig, NodeInput, NodeOutput, NodeCategory } from "@/lib/nodeflow/
 import { LLMNodeTools } from "./LLMNodeTools";
 import { NodeToolRegistry } from "../NodeTool";
 import { ResponseUsageMetrics } from "@/lib/models/parsed-response";
+import { ApiProvider } from "@/utils/api-config";
 
 export class LLMNode extends NodeBase {
   static readonly nodeName = "llm";
@@ -25,9 +26,10 @@ export class LLMNode extends NodeBase {
     const modelName = input.modelName;
     const apiKey = input.apiKey;
     const baseUrl = input.baseUrl;
-    const llmType = "openai";
+    const llmType = (input.llmType || "openai") as ApiProvider;
     const temperature = input.temperature;
     const language = input.language || "zh";
+    const maxTokens = input.number;
 
     if (!systemMessage) {
       throw new Error("System message is required for LLMNode");
@@ -48,6 +50,7 @@ export class LLMNode extends NodeBase {
         llmType,
         temperature,
         language,
+        maxTokens,
         reasoningEffort: input.reasoningEffort,
       },
     ) as { text: string; usage: ResponseUsageMetrics };

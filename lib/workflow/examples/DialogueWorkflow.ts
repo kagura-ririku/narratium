@@ -8,6 +8,7 @@ import { LLMNode } from "@/lib/nodeflow/LLMNode/LLMNode";
 import { RegexNode } from "@/lib/nodeflow/RegexNode/RegexNode";
 import { OutputNode } from "@/lib/nodeflow/OutputNode/OutputNode";
 import { PromptType } from "@/lib/models/character-prompts-model";
+import { ApiProvider, ReasoningEffort } from "@/utils/api-config";
 
 export interface DialogueWorkflowParams {
   characterId: string;
@@ -19,7 +20,7 @@ export interface DialogueWorkflowParams {
   modelName: string;
   apiKey: string;
   baseUrl?: string;
-  llmType?: "openai";
+  llmType?: ApiProvider;
   temperature?: number;
   maxTokens?: number;
   maxRetries?: number;
@@ -31,7 +32,7 @@ export interface DialogueWorkflowParams {
   streaming?: boolean;
   streamUsage?: boolean;
   fastModel?: boolean;
-  reasoningEffort?: "low" | "medium" | "high" | "xhigh";
+  reasoningEffort?: ReasoningEffort;
 }
 
 export class DialogueWorkflow extends BaseWorkflow {
@@ -111,7 +112,7 @@ export class DialogueWorkflow extends BaseWorkflow {
           category: NodeCategory.MIDDLE,
           next: ["regex-1"],
           initParams: [],
-          inputFields: ["systemMessage", "userMessage", "modelName", "apiKey", "baseUrl", "llmType", "temperature", "language", "reasoningEffort"],
+          inputFields: ["systemMessage", "userMessage", "modelName", "apiKey", "baseUrl", "llmType", "temperature", "language", "reasoningEffort", "number"],
           outputFields: ["llmResponse", "responseUsage"],
         },
         {

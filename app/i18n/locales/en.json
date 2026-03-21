@@ -54,6 +54,7 @@
     "configurations": "API Configurations",
     "newConfig": "New Config",
     "configName": "Configuration Name",
+    "apiFormat": "API Format",
     "configNamePlaceholder": "My API Configuration",
     "createConfig": "Create Configuration",
     "nameRequired": "Name is required",

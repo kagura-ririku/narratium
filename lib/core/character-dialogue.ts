@@ -4,7 +4,8 @@ import { PromptType } from "@/lib/models/character-prompts-model";
 import { getCharacterCompressorPromptZh, getCharacterCompressorPromptEn } from "@/lib/prompts/character-prompts";
 import { CharacterHistory } from "@/lib/core/character-history";
 import { DialogueOptions } from "@/lib/models/character-dialogue-model";
-import { invokeOpenAIResponses } from "@/utils/openai-responses";
+import { DEFAULT_RESPONSE_LENGTH, ApiProvider } from "@/utils/api-config";
+import { invokeLLM } from "@/utils/llm-api";
 
 export class CharacterDialogue {
   character: Character;
@@ -13,6 +14,7 @@ export class CharacterDialogue {
     modelName: string;
     apiKey: string;
     baseUrl: string;
+    llmType: ApiProvider;
     temperature: number;
     reasoningEffort?: DialogueOptions["reasoningEffort"];
   } | null;
@@ -62,6 +64,7 @@ export class CharacterDialogue {
       modelName,
       apiKey,
       baseUrl,
+      llmType = "openai",
       reasoningEffort,
       temperature = 0.7,
     } = options;
@@ -114,6 +117,7 @@ export class CharacterDialogue {
       modelName: safeModel,
       apiKey: safeApiKey,
       baseUrl,
+      llmType,
       temperature: llmSettings.temperature,
       reasoningEffort,
     };
@@ -132,12 +136,14 @@ export class CharacterDialogue {
         userPrompt = getCharacterCompressorPromptEn(userInput, story);
       }
 
-      const compressedStory = await invokeOpenAIResponses({
+      const compressedStory = await invokeLLM({
+        provider: this.llm.llmType,
         baseUrl: this.llm.baseUrl,
         apiKey: this.llm.apiKey,
         model: this.llm.modelName,
         systemMessage: "",
         userMessage: userPrompt,
+        maxTokens: DEFAULT_RESPONSE_LENGTH,
         temperature: this.llm.temperature,
         reasoningEffort: this.llm.reasoningEffort,
       });

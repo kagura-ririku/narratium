@@ -379,7 +379,7 @@ export default function CharacterPage() {
         modelName: activeConfig?.model || "",
         baseUrl: activeConfig?.baseUrl || "",
         apiKey: activeConfig?.apiKey || "",
-        llmType: "openai",
+        llmType: activeConfig?.type || "openai",
         language: language as "zh" | "en",
       });
 
@@ -456,7 +456,7 @@ export default function CharacterPage() {
         modelName: activeConfig.model,
         baseUrl: activeConfig.baseUrl,
         apiKey: activeConfig.apiKey,
-        llmType: "openai",
+        llmType: activeConfig.type,
         reasoningEffort: activeConfig.reasoningEffortEnabled ? activeConfig.reasoningEffort : undefined,
         language: language as "zh" | "en",
         streaming: shouldStream,
