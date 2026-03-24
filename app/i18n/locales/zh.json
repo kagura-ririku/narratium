@@ -354,7 +354,9 @@
     "jumpToMessage": "跳转到此消息",
     "regenerateMessage": "重新生成消息",
     "enableFastModel": "开启快速模式",
-    "disableFastModel": "关闭快速模式"
+    "disableFastModel": "关闭快速模式",
+    "requestFailed": "请求失败",
+    "errorRetryHint": "刚刚的输入已经保留，你可以检查配置后直接重试。"
   },
   "preset": {
     "title": "预设编辑器",

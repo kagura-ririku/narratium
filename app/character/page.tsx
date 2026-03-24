@@ -87,7 +87,7 @@ export default function CharacterPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitializing, setIsInitializing] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
   const [userInput, setUserInput] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -314,13 +314,59 @@ export default function CharacterPage() {
       console.error("Error refreshing dialogue:", err);
     }
   };
+
+  const createInlineErrorMessage = (message: string, id = `error-${Date.now()}`): Message => ({
+    id,
+    role: "error",
+    content: message,
+    timestamp: new Date().toISOString(),
+  });
+
+  const upsertInlineErrorMessage = (message: string, replaceMessageId?: string) => {
+    const errorMessage = createInlineErrorMessage(message, replaceMessageId || `error-${Date.now()}`);
+
+    setMessages((prev) => {
+      if (replaceMessageId && prev.some((item) => item.id === replaceMessageId)) {
+        return prev.map((item) => (item.id === replaceMessageId ? errorMessage : item));
+      }
+
+      return [...prev, errorMessage];
+    });
+  };
+
+  const getResponseErrorMessage = async (response: Response) => {
+    const fallback = `Failed to send message: ${response.status}`;
+    const contentType = response.headers.get("Content-Type") || "";
+
+    if (contentType.includes("application/json")) {
+      const payload = await response.json().catch(() => null) as {
+        message?: string;
+        error?: string | { message?: string };
+      } | null;
+
+      if (typeof payload?.message === "string" && payload.message.trim()) {
+        return payload.message.trim();
+      }
+
+      if (typeof payload?.error === "string" && payload.error.trim()) {
+        return payload.error.trim();
+      }
+
+      if (typeof payload?.error === "object" && typeof payload.error?.message === "string" && payload.error.message.trim()) {
+        return payload.error.message.trim();
+      }
+    }
+
+    const text = await response.text().catch(() => "");
+    return text.trim() || fallback;
+  };
   
   useEffect(() => {
     const loadCharacterAndDialogue = async () => {
       if (!characterId) return;
       
       setIsLoading(true);
-      setError("");
+      setPageError("");
       
       try {
         const username = localStorage.getItem("username") || undefined;
@@ -358,7 +404,7 @@ export default function CharacterPage() {
         }
       } catch (err) {
         console.error("Error loading character or dialogue:", err);
-        setError(typeof err === "object" && err !== null && "message" in err ? (err as Error).message : "Failed to load character");
+        setPageError(typeof err === "object" && err !== null && "message" in err ? (err as Error).message : "Failed to load character");
       } finally {
         setIsLoading(false);
       }
@@ -403,8 +449,8 @@ export default function CharacterPage() {
     }
   };
 
-  const handleSendMessage = async (message: string) => {
-    if (!character || isSending) return;
+  const handleSendMessage = async (message: string): Promise<boolean> => {
+    if (!character || isSending) return false;
 
     let pendingAssistantMessageId = "";
     let shouldStream = false;
@@ -419,7 +465,6 @@ export default function CharacterPage() {
       }
 
       setIsSending(true);
-      setError("");
       
       setSuggestedInputs([]);
       const userMessage = {
@@ -467,7 +512,7 @@ export default function CharacterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.status}`);
+        throw new Error(await getResponseErrorMessage(response));
       }
 
       const contentType = response.headers.get("Content-Type") || "";
@@ -543,7 +588,7 @@ export default function CharacterPage() {
           setSuggestedInputs(finalResult.parsedContent.nextPrompts);
         }
 
-        return;
+        return true;
       }
 
       const result = await response.json();
@@ -561,22 +606,28 @@ export default function CharacterPage() {
         if (result.parsedContent?.nextPrompts) {
           setSuggestedInputs(result.parsedContent.nextPrompts);
         }
+
+        return true;
       } else {
         throw new Error(result.message || "Failed to get response");
       }
     } catch (err) {
       console.error("Error sending message:", err);
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
       if (shouldStream && pendingAssistantMessageId) {
-        setMessages((prev) => prev.filter((item) => item.id !== pendingAssistantMessageId));
+        upsertInlineErrorMessage(errorMessage, pendingAssistantMessageId);
+      } else {
+        upsertInlineErrorMessage(errorMessage);
       }
-      setError(err instanceof Error ? err.message : "An error occurred");
+
+      return false;
     } finally {
       setIsSending(false);
     }
   };
 
   useEffect(() => {
-    if (character && !isLoading && !isInitializing && !error) {
+    if (character && !isLoading && !isInitializing && !pageError) {
       const hasSeenCharacterTour = localStorage.getItem("narratium_character_tour_completed");
       if (!hasSeenCharacterTour) {
         setTimeout(() => {
@@ -584,7 +635,7 @@ export default function CharacterPage() {
         }, 2000);
       }
     }
-  }, [character, isLoading, isInitializing, error, startCharacterTour]);
+  }, [character, isLoading, isInitializing, pageError, startCharacterTour]);
 
   useEffect(() => {
     const handleSwitchToPresetView = (event: any) => {
@@ -632,11 +683,11 @@ export default function CharacterPage() {
     );
   }
 
-  if (error || !character) {
+  if (pageError || !character) {
     return (
       <div className="flex flex-col items-center justify-center h-full fantasy-bg">
         <h1 className="text-2xl text-[#f4e8c1] mb-4">{t("characterChat.error") || "Error"}</h1>
-        <p className="text-[#c0a480] mb-6">{error || t("characterChat.characterNotFound") || "Character not found"}</p>
+        <p className="text-[#c0a480] mb-6">{pageError || t("characterChat.characterNotFound") || "Character not found"}</p>
         <a
           href="/character-cards"
           className="bg-[#252220] hover:bg-[#342f25] text-[#f4e8c1] font-medium py-2 px-4 rounded border border-[#534741]"
@@ -651,6 +702,7 @@ export default function CharacterPage() {
     e.preventDefault();
     if (!userInput.trim() || isSending) return;
   
+    const rawInput = userInput;
     let message = userInput;
     let hints: string[] = [];
   
@@ -692,7 +744,10 @@ export default function CharacterPage() {
     }
   
     setUserInput("");
-    await handleSendMessage(message);
+    const success = await handleSendMessage(message);
+    if (!success) {
+      setUserInput(rawInput);
+    }
   };
 
   const toggleSidebar = () => {

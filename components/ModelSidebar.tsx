@@ -108,6 +108,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [modelListEmpty, setModelListEmpty] = useState(false);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [modelFilterQuery, setModelFilterQuery] = useState("");
   const modelFieldRef = useRef<HTMLDivElement>(null);
 
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -200,6 +201,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
     setModelOptions([]);
     setModelListEmpty(false);
     setIsModelDropdownOpen(false);
+    setModelFilterQuery("");
     setFormError("");
   };
 
@@ -230,6 +232,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
     setModelOptions([]);
     setModelListEmpty(false);
     setIsModelDropdownOpen(false);
+    setModelFilterQuery("");
     setFormError("");
     setIsCreating(true);
   };
@@ -394,6 +397,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
 
       setModelOptions(uniqueModelList);
       setModelListEmpty(uniqueModelList.length === 0);
+      setModelFilterQuery("");
       setIsModelDropdownOpen(uniqueModelList.length > 0);
       setFormError("");
       flashState(setGetModelListSuccess);
@@ -401,6 +405,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
       console.error("Failed to fetch model list:", error);
       setModelOptions([]);
       setModelListEmpty(true);
+      setModelFilterQuery("");
       setIsModelDropdownOpen(false);
       flashState(setGetModelListError);
     }
@@ -450,6 +455,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
     setModelOptions([]);
     setModelListEmpty(false);
     setIsModelDropdownOpen(false);
+    setModelFilterQuery("");
     setDraft((current) => {
       const currentBaseUrl = normalizeBaseUrl(current.baseUrl);
       const shouldReplaceBaseUrl = !currentBaseUrl || currentBaseUrl === getDefaultBaseUrl(current.type);
@@ -485,7 +491,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
       ? "Thinking Level"
       : "Reasoning Effort";
   const filteredModelOptions = modelOptions.filter((option) => (
-    !draft.model.trim() || option.toLowerCase().includes(draft.model.trim().toLowerCase())
+    !modelFilterQuery.trim() || option.toLowerCase().includes(modelFilterQuery.trim().toLowerCase())
   ));
 
   const outerClassName = isMobile
@@ -712,7 +718,9 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
                       type="text"
                       value={draft.model}
                       onChange={(event) => {
-                        updateDraft({ model: event.target.value });
+                        const nextModel = event.target.value;
+                        updateDraft({ model: nextModel });
+                        setModelFilterQuery(nextModel);
                         if (modelOptions.length > 0) {
                           setIsModelDropdownOpen(true);
                         }
@@ -745,6 +753,7 @@ export default function ModelSidebar({ isOpen, toggleSidebar }: ModelSidebarProp
                           type="button"
                           onClick={() => {
                             updateDraft({ model: option });
+                            setModelFilterQuery("");
                             setIsModelDropdownOpen(false);
                           }}
                           className={`w-full text-left px-3 py-2 text-sm transition-colors ${

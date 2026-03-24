@@ -182,6 +182,8 @@ export default function CharacterChatPanel({
               {messages.map((message, index) => {
                 if (message.role === "sample") return null;
 
+                const isInlineError = message.role === "error";
+
                 return message.role === "user" ? (
                   <div key={index} className="flex justify-end mb-4">
                     <div className="whitespace-pre-line text-[#f4e8c1] story-text leading-relaxed magical-text">
@@ -199,10 +201,27 @@ export default function CharacterChatPanel({
                     </div>
                   </div>
                 ) : (
-                  <div key={index} className="mb-6">
+                  <div key={message.id} className="mb-6">
                     <div className="flex flex-wrap items-center gap-y-1 mb-2">
                       <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
-                        {character.avatar_path ? (
+                        {isInlineError ? (
+                          <div className="w-full h-full flex items-center justify-center bg-[#3a1f1f] text-[#f1b4b4]">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.8}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 9v4m0 4h.01M10.29 3.86l-7.5 13A1 1 0 003.66 18h16.68a1 1 0 00.87-1.5l-7.5-13a1 1 0 00-1.74 0z"
+                              />
+                            </svg>
+                          </div>
+                        ) : character.avatar_path ? (
                           <CharacterAvatarBackground avatarPath={character.avatar_path} />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-[#1a1816]">
@@ -225,7 +244,9 @@ export default function CharacterChatPanel({
                       </div>
                       <div className="flex items-center">
                         <span className={`text-sm font-medium text-[#f4e8c1] ${serifFontClass}`}>
-                          {character.name}
+                          {isInlineError
+                            ? (t("characterChat.requestFailed") || "Request Failed")
+                            : character.name}
                         </span>
                         {message.role === "assistant" && shouldShowRegenerateButton(message, index) && (
                           <>
@@ -361,22 +382,35 @@ export default function CharacterChatPanel({
                         </button>
                       </div>
                     </div>
-                    {message.parsedContent?.usage && (
+                    {!isInlineError && message.parsedContent?.usage && (
                       <div className="pl-10 mb-3 text-[11px] leading-5 text-[#8a8177]">
                         {formatResponseMeta(message.parsedContent.usage)}
                       </div>
                     )}
-                    <ChatHtmlBubble
-                      key={message.id}
-                      html={message.content}
-                      isLoading={
-                        isSending && index === messages.length - 1 && message.content.trim() === ""
-                      }
-                      enableStreaming={false}
-                      onContentChange={
-                        index === messages.length - 1 ? () => maybeScrollToBottom() : undefined
-                      }
-                    />
+                    {isInlineError ? (
+                      <div className="pl-10">
+                        <div className="rounded-xl border border-[#8c4747] bg-[rgba(58,31,31,0.72)] px-4 py-3 shadow-[0_0_16px_rgba(140,71,71,0.12)]">
+                          <div className={`text-sm leading-6 text-[#f4d7d7] ${fontClass}`}>
+                            {message.content}
+                          </div>
+                          <div className={`mt-2 text-[11px] leading-5 text-[#c9a7a7] ${fontClass}`}>
+                            {t("characterChat.errorRetryHint") || "Your input has been restored. You can adjust it and try again."}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <ChatHtmlBubble
+                        key={message.id}
+                        html={message.content}
+                        isLoading={
+                          isSending && index === messages.length - 1 && message.content.trim() === ""
+                        }
+                        enableStreaming={false}
+                        onContentChange={
+                          index === messages.length - 1 ? () => maybeScrollToBottom() : undefined
+                        }
+                      />
+                    )}
                   </div>
                 );
               })}

@@ -354,7 +354,9 @@
     "jumpToMessage": "Jump to Message",
     "regenerateMessage": "Regenerate Message",
     "enableFastModel": "Enable Fast Mode",
-    "disableFastModel": "Disable Fast Mode"
+    "disableFastModel": "Disable Fast Mode",
+    "requestFailed": "Request Failed",
+    "errorRetryHint": "Your input has been restored. You can adjust it and try again."
   },
   "preset": {
     "title": "Preset Manager",
