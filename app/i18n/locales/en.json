@@ -356,7 +356,7 @@
     "enableFastModel": "Enable Fast Mode",
     "disableFastModel": "Disable Fast Mode",
     "requestFailed": "Request Failed",
-    "errorRetryHint": "Your input has been restored. You can adjust it and try again."
+    "errorRetryHint": "Use the regenerate button on this message to send the request again."
   },
   "preset": {
     "title": "Preset Manager",

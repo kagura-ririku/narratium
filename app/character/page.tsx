@@ -220,13 +220,35 @@ export default function CharacterPage() {
     if (!characterId) return;
     
     try {
-      const messageIndex = messages.findIndex(msg => msg.id === nodeId && msg.role === "assistant");
+      const messageIndex = messages.findIndex(msg => msg.id === nodeId);
       if (messageIndex === -1) {
         console.warn(`Message not found: ${nodeId}`);
         return;
       }
       const messageToRegenerate = messages[messageIndex];
-      if (messageToRegenerate.role != "assistant") {
+
+      if (messageToRegenerate.role === "error") {
+        let previousUserMessage = null;
+        for (let i = messageIndex - 1; i >= 0; i--) {
+          if (messages[i].role === "user") {
+            previousUserMessage = messages[i];
+            break;
+          }
+        }
+
+        if (!previousUserMessage) {
+          console.warn("No previous user message found for retry");
+          return;
+        }
+
+        await handleSendMessage(previousUserMessage.content, {
+          appendUserMessage: false,
+          assistantMessageId: nodeId,
+        });
+        return;
+      }
+
+      if (messageToRegenerate.role !== "assistant") {
         console.warn("Can only regenerate assistant messages");
         return;
       }
@@ -314,6 +336,14 @@ export default function CharacterPage() {
       console.error("Error refreshing dialogue:", err);
     }
   };
+
+  const createPendingAssistantMessage = (id: string): Message => ({
+    id,
+    role: "assistant",
+    content: "",
+    timestamp: new Date().toISOString(),
+    parsedContent: null,
+  });
 
   const createInlineErrorMessage = (message: string, id = `error-${Date.now()}`): Message => ({
     id,
@@ -449,10 +479,18 @@ export default function CharacterPage() {
     }
   };
 
-  const handleSendMessage = async (message: string): Promise<boolean> => {
+  const handleSendMessage = async (
+    message: string,
+    options?: {
+      appendUserMessage?: boolean;
+      assistantMessageId?: string;
+    },
+  ): Promise<boolean> => {
     if (!character || isSending) return false;
 
-    let pendingAssistantMessageId = "";
+    const appendUserMessage = options?.appendUserMessage !== false;
+    const responseNodeId = uuidv4();
+    const assistantMessageId = options?.assistantMessageId || responseNodeId;
     let shouldStream = false;
 
     try {
@@ -467,32 +505,35 @@ export default function CharacterPage() {
       setIsSending(true);
       
       setSuggestedInputs([]);
-      const userMessage = {
-        id: new Date().toISOString() + "-user",
-        role: "user",
-        content: message,
-        timestamp: new Date().toISOString(),
-      }; 
-      setMessages((prev) => [...prev, userMessage]);
+
+      if (appendUserMessage) {
+        const userMessage = {
+          id: new Date().toISOString() + "-user",
+          role: "user",
+          content: message,
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, userMessage, createPendingAssistantMessage(assistantMessageId)]);
+      } else {
+        setMessages((prev) => {
+          if (prev.some((item) => item.id === assistantMessageId)) {
+            return prev.map((item) => (
+              item.id === assistantMessageId
+                ? createPendingAssistantMessage(assistantMessageId)
+                : item
+            ));
+          }
+
+          return [...prev, createPendingAssistantMessage(assistantMessageId)];
+        });
+      }
 
       const language = localStorage.getItem("language") || "zh";
       const promptType = localStorage.getItem("promptType");
       const username = localStorage.getItem("username") || "";
       const responseLength = getStoredResponseLength();
-      const nodeId = uuidv4();
       const fastModel = localStorage.getItem("fastModelEnabled") === "true";
       shouldStream = activeModes.streaming === true;
-      pendingAssistantMessageId = nodeId;
-
-      if (shouldStream) {
-        setMessages(prev => [...prev, {
-          id: nodeId,
-          role: "assistant",
-          content: "",
-          timestamp: new Date().toISOString(),
-          parsedContent: null,
-        }]);
-      }
 
       const response = await handleCharacterChatRequest({
         username,
@@ -507,7 +548,7 @@ export default function CharacterPage() {
         streaming: shouldStream,
         promptType: promptType as PromptType,
         number: responseLength,
-        nodeId,
+        nodeId: responseNodeId,
         fastModel: fastModel,
       });
 
@@ -527,11 +568,17 @@ export default function CharacterPage() {
         let buffer = "";
         let finalResult: any = null;
 
-        const updateAssistantMessage = (content: string, parsedContent?: ParsedResponse | null) => {
+        const updateAssistantMessage = (
+          content: string,
+          parsedContent?: ParsedResponse | null,
+          nextMessageId?: string,
+        ) => {
           setMessages((prev) => prev.map((item) => (
-            item.id === nodeId
+            item.id === assistantMessageId
               ? {
                 ...item,
+                id: nextMessageId || item.id,
+                role: "assistant",
                 content,
                 parsedContent: parsedContent ?? item.parsedContent ?? null,
               }
@@ -570,7 +617,7 @@ export default function CharacterPage() {
 
             if (event.type === "complete") {
               finalResult = event;
-              updateAssistantMessage(event.content || "", event.parsedContent || null);
+              updateAssistantMessage(event.content || "", event.parsedContent || null, responseNodeId);
               continue;
             }
 
@@ -594,14 +641,18 @@ export default function CharacterPage() {
       const result = await response.json();
       
       if (result.success) {
-        const assistantMessage = {
-          id: nodeId,
-          role: "assistant",
-          content: result.content || "",
-          timestamp: new Date().toISOString(),
-          parsedContent: result.parsedContent || null,
-        };
-        setMessages(prev => [...prev, assistantMessage]);
+        setMessages((prev) => prev.map((item) => (
+          item.id === assistantMessageId
+            ? {
+              ...item,
+              id: responseNodeId,
+              role: "assistant",
+              content: result.content || "",
+              timestamp: new Date().toISOString(),
+              parsedContent: result.parsedContent || null,
+            }
+            : item
+        )));
         
         if (result.parsedContent?.nextPrompts) {
           setSuggestedInputs(result.parsedContent.nextPrompts);
@@ -614,11 +665,7 @@ export default function CharacterPage() {
     } catch (err) {
       console.error("Error sending message:", err);
       const errorMessage = err instanceof Error ? err.message : "An error occurred";
-      if (shouldStream && pendingAssistantMessageId) {
-        upsertInlineErrorMessage(errorMessage, pendingAssistantMessageId);
-      } else {
-        upsertInlineErrorMessage(errorMessage);
-      }
+      upsertInlineErrorMessage(errorMessage, assistantMessageId);
 
       return false;
     } finally {
@@ -702,7 +749,6 @@ export default function CharacterPage() {
     e.preventDefault();
     if (!userInput.trim() || isSending) return;
   
-    const rawInput = userInput;
     let message = userInput;
     let hints: string[] = [];
   
@@ -744,10 +790,7 @@ export default function CharacterPage() {
     }
   
     setUserInput("");
-    const success = await handleSendMessage(message);
-    if (!success) {
-      setUserInput(rawInput);
-    }
+    await handleSendMessage(message);
   };
 
   const toggleSidebar = () => {

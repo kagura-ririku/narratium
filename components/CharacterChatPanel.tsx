@@ -137,7 +137,7 @@ export default function CharacterChatPanel({
 
   const shouldShowRegenerateButton = (message: Message, index: number) => {
     if (isSending) return false;
-    if (message.role !== "assistant") return false;
+    if (message.role !== "assistant" && message.role !== "error") return false;
     if (index !== messages.length - 1) return false;
     
     return true;
@@ -324,32 +324,34 @@ export default function CharacterChatPanel({
                         )}
                       </div>
                       <div className="flex items-center">
-                        <button
-                          onClick={() => {
-                            trackButtonClick("page", "跳转到此消息");
-                            onTruncate(message.id);
-                          }}
-                          className="ml-1 w-6 h-6 flex items-center justify-center text-[#a18d6f] hover:text-green-400 bg-[#1c1c1c] rounded-lg border border-[#333333] shadow-inner transition-all duration-300 hover:border-[#444444] hover:shadow-[0_0_8px_rgba(34,197,94,0.4)] group relative"
-                          data-tooltip={t("characterChat.jumpToMessage")}
-                        >
-                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-[#2a261f] text-[#f4e8c1] text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap border border-[#534741]">
-                            {t("characterChat.jumpToMessage")}
-                          </div>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="12"
-                            height="12"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                        {!isInlineError && message.content.trim() !== "" && (
+                          <button
+                            onClick={() => {
+                              trackButtonClick("page", "跳转到此消息");
+                              onTruncate(message.id);
+                            }}
+                            className="ml-1 w-6 h-6 flex items-center justify-center text-[#a18d6f] hover:text-green-400 bg-[#1c1c1c] rounded-lg border border-[#333333] shadow-inner transition-all duration-300 hover:border-[#444444] hover:shadow-[0_0_8px_rgba(34,197,94,0.4)] group relative"
+                            data-tooltip={t("characterChat.jumpToMessage")}
                           >
-                            <path d="M12 19V5"></path>
-                            <polyline points="5 12 12 5 19 12"></polyline>
-                          </svg>
-                        </button>
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-[#2a261f] text-[#f4e8c1] text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap border border-[#534741]">
+                              {t("characterChat.jumpToMessage")}
+                            </div>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="12"
+                              height="12"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M12 19V5"></path>
+                              <polyline points="5 12 12 5 19 12"></polyline>
+                            </svg>
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             trackButtonClick("page", "重新生成消息");
@@ -394,7 +396,7 @@ export default function CharacterChatPanel({
                             {message.content}
                           </div>
                           <div className={`mt-2 text-[11px] leading-5 text-[#c9a7a7] ${fontClass}`}>
-                            {t("characterChat.errorRetryHint") || "Your input has been restored. You can adjust it and try again."}
+                            {t("characterChat.errorRetryHint") || "Use the regenerate button on this message to try again."}
                           </div>
                         </div>
                       </div>
